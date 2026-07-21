@@ -5,6 +5,7 @@ WORKDIR /app
 COPY package.json pnpm-lock.yaml pnpm-workspace.yaml tsconfig.json ./
 COPY packages/event-schema/package.json ./packages/event-schema/
 COPY packages/id3/package.json ./packages/id3/
+COPY packages/presentation-model/package.json ./packages/presentation-model/
 COPY services/api/package.json ./services/api/
 COPY apps/admin/package.json ./apps/admin/
 COPY apps/player/package.json ./apps/player/
@@ -13,10 +14,12 @@ RUN pnpm install --frozen-lockfile
 
 COPY packages/event-schema/ ./packages/event-schema/
 COPY packages/id3/ ./packages/id3/
+COPY packages/presentation-model/ ./packages/presentation-model/
 COPY services/api/ ./services/api/
 
 RUN pnpm --filter @showgather/event-schema build
 RUN pnpm --filter @showgather/id3 build
+RUN pnpm --filter @showgather/presentation-model build
 RUN pnpm --filter @showgather/api build
 
 ENV ID3_INJECTOR_HOST=stream

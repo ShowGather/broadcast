@@ -65,10 +65,13 @@ services:
     build:
       context: ../..
       dockerfile: deploy/compose/Dockerfile.player
+      args:
+        VITE_HLS_URL: ${VITE_HLS_URL:-http://127.0.0.1:8000/hls/stream.m3u8}
     ports:
       - "3003:3003"
     environment:
       API_URL: http://api:3001
+      VITE_HLS_URL: ${VITE_HLS_URL:-http://127.0.0.1:8000/hls/stream.m3u8}
     depends_on:
       api:
         condition: service_healthy

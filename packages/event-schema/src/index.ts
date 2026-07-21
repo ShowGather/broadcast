@@ -12,7 +12,9 @@ export const MAX_PAYLOAD_BYTES = 127;
  * A ShowGather sync event.
  * This is the wire format encoded into ID3 TPE1 frames.
  */
-export interface ShowGatherEvent {
+export type PresentationCueKey = "goal-home" | "speaker-intro" | "alert-test";
+
+export interface OverlayShowEvent {
   /** Schema version. Always 1 for POC. */
   v: 1;
   /** Unique event ID for deduplication. */
@@ -30,6 +32,38 @@ export interface ShowGatherEvent {
   };
 }
 
+/** Compact ID3 signal for a viewer-side, named presentation cue. */
+export interface PresentationCueEvent {
+  v: 1;
+  id: string;
+  t: "presentation.cue";
+  p: {
+    cue: PresentationCueKey;
+    /** Optional override for the cue's primary transient duration. */
+    dur?: number;
+  };
+}
+
+/** Compact signal that removes presentation while leaving video untouched. */
+export interface PresentationClearEvent {
+  v: 1;
+  id: string;
+  t: "presentation.clear";
+  p: Record<string, never>;
+}
+
+export type ShowGatherEvent = OverlayShowEvent | PresentationCueEvent | PresentationClearEvent;
+
+export const PRESENTATION_CUE_KEYS: readonly PresentationCueKey[] = [
+  "goal-home",
+  "speaker-intro",
+  "alert-test",
+];
+
+export function isPresentationCueKey(value: unknown): value is PresentationCueKey {
+  return typeof value === "string" && PRESENTATION_CUE_KEYS.includes(value as PresentationCueKey);
+}
+
 /**
  * Validate that a parsed object is a valid ShowGatherEvent.
  * Returns the event if valid, null otherwise.
@@ -40,11 +74,29 @@ export function validateEvent(data: unknown): ShowGatherEvent | null {
 
   if (obj.v !== 1) return null;
   if (typeof obj.id !== "string" || obj.id.length === 0) return null;
-  if (obj.t !== "overlay.show") return null;
+  if (obj.t !== "overlay.show" && obj.t !== "presentation.cue" && obj.t !== "presentation.clear") return null;
 
   const p = obj.p;
   if (typeof p !== "object" || p === null) return null;
   const payload = p as Record<string, unknown>;
+  if (obj.t === "presentation.clear") {
+    return { v: 1, id: obj.id as string, t: "presentation.clear", p: {} };
+  }
+
+  if (obj.t === "presentation.cue") {
+    if (!isPresentationCueKey(payload.cue)) return null;
+    if (payload.dur !== undefined && (typeof payload.dur !== "number" || payload.dur <= 0)) return null;
+    return {
+      v: 1,
+      id: obj.id as string,
+      t: "presentation.cue",
+      p: {
+        cue: payload.cue,
+        ...(typeof payload.dur === "number" ? { dur: payload.dur } : {}),
+      },
+    };
+  }
+
   if (typeof payload.title !== "string" || payload.title.length === 0) return null;
   if (typeof payload.dur !== "number" || payload.dur <= 0) return null;
 

@@ -16,15 +16,15 @@ Events are queued when `FRAG_PARSING_METADATA` fires. The `requestAnimationFrame
 
 ### Pause
 
-Pausing the video **naturally pauses event progression**. The `requestAnimationFrame` loop continues to run, but `video.currentTime` does not change, so no new events are fired. Events that were queued before the pause remain queued and will fire when playback resumes and the playhead reaches their PTS.
+Pausing the video **pauses all presentation progression**. The `requestAnimationFrame` loop continues to run, but `video.currentTime` does not change, so no new events are fired and active overlays do not expire. Events that were queued before the pause remain queued and will fire when playback resumes and the playhead reaches their PTS.
 
 ### Seek Forward
 
 When the user seeks forward:
-1. All queued events with `metadataPts <= video.currentTime` are **fired immediately** (they were missed during the seek).
-2. All queued events with `metadataPts < video.currentTime` that are still relevant remain in the queue.
+1. Queued transient events with `metadataPts <= video.currentTime` are discarded; they are no longer relevant to the sought-to moment.
+2. Future queued events remain in the queue.
 3. Events that have already been fired (their ID is in the seen set) are not re-fired.
-4. Active overlays whose `hideAt` time has passed are removed.
+4. Active overlays whose media-time expiry PTS has passed are removed.
 
 ### Seek Backward
 
@@ -33,6 +33,7 @@ When the user seeks backward:
 2. Events whose PTS is now in the future remain in the queue.
 3. The seen ID set is **not cleared** — this prevents duplicate overlays.
 4. If the user seeks to a point before an event's PTS, and that event was already fired, it will **not** fire again.
+5. An active overlay remains active until its original media-time expiry PTS.
 
 ### Reload (Page Refresh)
 
@@ -56,7 +57,7 @@ hls.js does not deduplicate metadata samples. The same event may appear in multi
 //   3. Add to seenIds, push to queue with metadataPts = sample.pts
 // On rAF tick:
 //   1. For each queued event where video.currentTime >= metadataPts → fire overlay, log delta
-//   2. Remove expired overlays (Date.now() >= hideAt)
+//   2. Remove expired overlays (video.currentTime >= expiresAtPts)
 // On seeking:
 //   1. Filter queue to keep only future events
 //   2. Filter active overlays to keep only non-expired ones
