@@ -1,8 +1,15 @@
 import type { FastifyInstance } from "fastify";
 import type { ServerResponse } from "node:http";
 import { createEvent, type EventRequest } from "./events.js";
+import type { ShowGatherEvent } from "@showgather/event-schema";
 
 const clients = new Set<ServerResponse>();
+
+export function dispatchRehearsalEvent(event: ShowGatherEvent) {
+  const payload = `data: ${JSON.stringify(event)}\n\n`;
+  for (const client of clients) client.write(payload);
+  return { event, receivers: clients.size };
+}
 
 /**
  * Development-only rehearsal channel. It never touches the ID3 injector; a
@@ -26,8 +33,6 @@ export async function rehearsalRoutes(app: FastifyInstance) {
     const created = createEvent(request.body ?? {});
     if ("error" in created) return reply.status(400).send({ error: created.error });
 
-    const payload = `data: ${JSON.stringify(created.event)}\n\n`;
-    for (const client of clients) client.write(payload);
-    return reply.status(201).send({ event: created.event, receivers: clients.size });
+    return reply.status(201).send(dispatchRehearsalEvent(created.event));
   });
 }

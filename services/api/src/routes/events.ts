@@ -24,7 +24,7 @@ export interface EventRequest {
   command?: PresentationCommandPayload;
 }
 
-interface StoredEvent {
+export interface StoredEvent {
   event: ShowGatherEvent;
   injectedAt: string;
   injectionResponse: unknown;
@@ -34,6 +34,20 @@ const events: StoredEvent[] = [];
 const channelPresentation = new ChannelPresentationState();
 // Preserve total order between revision assignment and the asynchronous injector.
 let dispatchTail: Promise<void> = Promise.resolve();
+
+export async function dispatchLiveEvent(event: ShowGatherEvent): Promise<StoredEvent> {
+  const dispatch = dispatchTail.then(async () => {
+    const revised = channelPresentation.withRevision(event);
+    const id3Base64 = Buffer.from(encodeTpe1Frame(encodeEvent(revised))).toString("base64");
+    const injectorResponse = await fetch(INJECTOR_URL, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ id3_base64: id3Base64 }) });
+    const stored: StoredEvent = { event: revised, injectedAt: new Date().toISOString(), injectionResponse: await injectorResponse.json() };
+    events.push(stored);
+    channelPresentation.apply(revised);
+    return stored;
+  });
+  dispatchTail = dispatch.then(() => undefined, () => undefined);
+  return dispatch;
+}
 
 export function createEvent(body: EventRequest): { event: ShowGatherEvent } | { error: string } {
   const { title, message, durationMs, cue, action, command } = body;
@@ -69,24 +83,7 @@ export async function eventRoutes(app: FastifyInstance) {
   }>("/events", async (request, reply) => {
     const created = createEvent(request.body ?? {});
     if ("error" in created) return reply.status(400).send({ error: created.error });
-    const dispatch = dispatchTail.then(async () => {
-      const event = channelPresentation.withRevision(created.event);
-      const json = encodeEvent(event);
-      const id3Bytes = encodeTpe1Frame(json);
-      const id3Base64 = Buffer.from(id3Bytes).toString("base64");
-      const injectorResponse = await fetch(INJECTOR_URL, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ id3_base64: id3Base64 }),
-      });
-      const injectionResult = await injectorResponse.json();
-      const stored: StoredEvent = { event, injectedAt: new Date().toISOString(), injectionResponse: injectionResult };
-      events.push(stored);
-      channelPresentation.apply(event);
-      return stored;
-    });
-    dispatchTail = dispatch.then(() => undefined, () => undefined);
-    const stored = await dispatch;
+    const stored = await dispatchLiveEvent(created.event);
 
     return reply.status(201).send(stored);
   });

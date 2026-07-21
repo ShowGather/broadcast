@@ -3,6 +3,7 @@ import cors from "@fastify/cors";
 import { eventRoutes } from "./routes/events.js";
 import { measurementRoutes } from "./routes/measurements.js";
 import { rehearsalRoutes } from "./routes/rehearsal.js";
+import { rundownRoutes } from "./routes/rundown.js";
 
 export async function buildApp() {
   const app = Fastify({ logger: true });
@@ -11,6 +12,7 @@ export async function buildApp() {
   await app.register(eventRoutes, { prefix: "/api" });
   await app.register(measurementRoutes, { prefix: "/api" });
   await app.register(rehearsalRoutes, { prefix: "/api" });
+  await app.register(rundownRoutes, { prefix: "/api" });
 
   app.get("/api/health", async () => ({
     status: "ok",

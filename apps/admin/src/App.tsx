@@ -4,6 +4,7 @@ interface StoredEvent {
   event: { id: string; t: string; p: Record<string, unknown> };
   injectedAt: string;
 }
+interface RundownCue { id: string; label: string; order: number; status: "pending" | "active" | "complete"; executionId?: string; }
 
 function eventLabel(event: StoredEvent["event"]) {
   if (event.t === "presentation.cue") return `Cue: ${event.p.cue ?? "unknown"}`;
@@ -25,6 +26,7 @@ export default function App() {
   const [secondary, setSecondary] = useState("");
   const [label, setLabel] = useState("");
   const [commandDuration, setCommandDuration] = useState(8000);
+  const [rundown, setRundown] = useState<RundownCue[]>([]);
 
   const fetchEvents = useCallback(async () => {
     try {
@@ -38,6 +40,12 @@ export default function App() {
     const interval = window.setInterval(fetchEvents, 5_000);
     return () => window.clearInterval(interval);
   }, [fetchEvents]);
+
+  const fetchRundown = useCallback(async () => {
+    const response = await fetch(`/api/rundown/${rehearsal ? "rehearsal" : "live"}`);
+    if (response.ok) setRundown((await response.json()).cues);
+  }, [rehearsal]);
+  useEffect(() => { fetchRundown().catch(() => {}); }, [fetchRundown]);
 
   const send = async (body: Record<string, unknown>, success: string) => {
     setStatus(""); setError("");
@@ -63,6 +71,15 @@ export default function App() {
     send({ command }, `${commandKind} command sent`);
   };
 
+  const goCue = async (cue: RundownCue, rerun = false) => {
+    setStatus(""); setError("");
+    try {
+      const response = await fetch(`/api/rundown/${rehearsal ? "rehearsal" : "live"}/go`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ cueId: cue.id, ...(rerun ? { rerun: true } : {}) }) });
+      if (!response.ok) throw new Error(await response.text());
+      const result = await response.json(); setRundown(result.cues); setStatus(`${rehearsal ? "Rehearsal" : "Live"} rundown: ${cue.label} complete`); if (!rehearsal) fetchEvents();
+    } catch (reason) { setError(reason instanceof Error ? reason.message : "Unable to execute cue"); }
+  };
+
   return <div className="container">
     <header className="header"><h1>ShowGather Broadcast — Control</h1><p>{rehearsal ? "Rehearsal cues go only to opted-in preview players." : "Live controls send compact, timed metadata to the HLS pipeline."}</p>
       <button className={`mode-toggle ${rehearsal ? "rehearsal" : ""}`} onClick={() => setRehearsal((current) => !current)}>{rehearsal ? "🟡 Rehearsal mode" : "🔴 Live mode"}</button>
@@ -77,6 +94,14 @@ export default function App() {
         <button className="safe-clear" onClick={() => send({ action: "safe-clear" }, "Safe Clear sent")}>✕ Safe Clear</button>
       </div>
       <p className="hint">Safe Clear removes presentation only. The programme video continues uninterrupted.</p>
+    </section>
+
+    <section className="section">
+      <h2>Rundown — {rehearsal ? "Rehearsal" : "Live"}</h2>
+      <p className="hint">GO uses an idempotent execution ID. Completed cues require explicit re-run; rehearsal state is separate from live.</p>
+      <div className="cue-grid">
+        {rundown.map((cue) => <div key={cue.id}><strong>{cue.order}. {cue.label}</strong><span className="hint"> {cue.status}</span><button disabled={cue.status === "active"} onClick={() => goCue(cue)}>GO</button>{cue.status === "complete" && <button onClick={() => goCue(cue, true)}>Re-run</button>}</div>)}
+      </div>
     </section>
 
     <section className="section">
