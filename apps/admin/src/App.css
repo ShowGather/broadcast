@@ -27,6 +27,7 @@ body {
 
 .header p, .hint { color: #8490a2; font-size: .85rem; line-height: 1.45; }
 .header p { margin-top: -10px; margin-bottom: 24px; }
+.connection { display: inline-block; margin: -14px 0 16px!important; padding: 4px 8px; border: 1px solid #45536a; border-radius: 999px; font-size: .72rem!important; text-transform: capitalize; }.connection--connected { border-color: #2f8158; color: #9be5b6!important; }.connection--offline { border-color: #9d4040; color: #ffb3b3!important; }.connection--checking { color: #d4b66a!important; }
 .mode-toggle { margin: -12px 0 20px; padding: 7px 10px; border: 1px solid #7b3c3c; border-radius: 5px; background: #2c1518; color: #ffc7c7; cursor: pointer; font-size: .78rem; }.mode-toggle.rehearsal { border-color: #8c7028; background: #2c2615; color: #ffe3a0; }
 .cue-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
 .cue-grid button { padding: 12px; border: 1px solid #315477; border-radius: 6px; background: #142238; color: #d9efff; cursor: pointer; font-weight: 650; }

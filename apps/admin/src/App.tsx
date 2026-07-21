@@ -27,6 +27,7 @@ export default function App() {
   const [label, setLabel] = useState("");
   const [commandDuration, setCommandDuration] = useState(8000);
   const [rundown, setRundown] = useState<RundownCue[]>([]);
+  const [apiConnection, setApiConnection] = useState<"checking" | "connected" | "offline">("checking");
 
   const fetchEvents = useCallback(async () => {
     try {
@@ -46,6 +47,16 @@ export default function App() {
     if (response.ok) setRundown((await response.json()).cues);
   }, [rehearsal]);
   useEffect(() => { fetchRundown().catch(() => {}); }, [fetchRundown]);
+
+  useEffect(() => {
+    let active = true;
+    const check = async () => {
+      try { const response = await fetch("/api/health"); if (active) setApiConnection(response.ok ? "connected" : "offline"); }
+      catch { if (active) setApiConnection("offline"); }
+    };
+    check(); const interval = window.setInterval(check, 5_000);
+    return () => { active = false; window.clearInterval(interval); };
+  }, []);
 
   const send = async (body: Record<string, unknown>, success: string) => {
     setStatus(""); setError("");
@@ -81,7 +92,7 @@ export default function App() {
   };
 
   return <div className="container">
-    <header className="header"><h1>ShowGather Broadcast — Control</h1><p>{rehearsal ? "Rehearsal cues go only to opted-in preview players." : "Live controls send compact, timed metadata to the HLS pipeline."}</p>
+    <header className="header"><h1>ShowGather Broadcast — Control</h1><p>{rehearsal ? "Rehearsal cues go only to opted-in preview players." : "Live controls send compact, timed metadata to the HLS pipeline."}</p><p className={`connection connection--${apiConnection}`}>API {apiConnection}</p>
       <button className={`mode-toggle ${rehearsal ? "rehearsal" : ""}`} onClick={() => setRehearsal((current) => !current)}>{rehearsal ? "🟡 Rehearsal mode" : "🔴 Live mode"}</button>
     </header>
 
