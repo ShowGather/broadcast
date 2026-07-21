@@ -29,6 +29,8 @@ interface StoredEvent {
 
 const events: StoredEvent[] = [];
 const channelPresentation = new ChannelPresentationState();
+// Preserve total order between revision assignment and the asynchronous injector.
+let dispatchTail: Promise<void> = Promise.resolve();
 
 export function createEvent(body: EventRequest): { event: ShowGatherEvent } | { error: string } {
   const { title, message, durationMs, cue, action } = body;
@@ -59,28 +61,24 @@ export async function eventRoutes(app: FastifyInstance) {
   }>("/events", async (request, reply) => {
     const created = createEvent(request.body ?? {});
     if ("error" in created) return reply.status(400).send({ error: created.error });
-    const { event } = created;
-
-    const json = encodeEvent(event);
-    const id3Bytes = encodeTpe1Frame(json);
-    const id3Base64 = Buffer.from(id3Bytes).toString("base64");
-
-    const injectorResponse = await fetch(INJECTOR_URL, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ id3_base64: id3Base64 }),
+    const dispatch = dispatchTail.then(async () => {
+      const event = channelPresentation.withRevision(created.event);
+      const json = encodeEvent(event);
+      const id3Bytes = encodeTpe1Frame(json);
+      const id3Base64 = Buffer.from(id3Bytes).toString("base64");
+      const injectorResponse = await fetch(INJECTOR_URL, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id3_base64: id3Base64 }),
+      });
+      const injectionResult = await injectorResponse.json();
+      const stored: StoredEvent = { event, injectedAt: new Date().toISOString(), injectionResponse: injectionResult };
+      events.push(stored);
+      channelPresentation.apply(event);
+      return stored;
     });
-
-    const injectionResult = await injectorResponse.json();
-
-    const stored: StoredEvent = {
-      event,
-      injectedAt: new Date().toISOString(),
-      injectionResponse: injectionResult,
-    };
-
-    events.push(stored);
-    channelPresentation.apply(event);
+    dispatchTail = dispatch.then(() => undefined, () => undefined);
+    const stored = await dispatch;
 
     return reply.status(201).send(stored);
   });

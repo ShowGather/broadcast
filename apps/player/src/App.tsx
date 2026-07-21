@@ -6,6 +6,7 @@ import { PresentationProvider, usePresentation } from "./presentation/Presentati
 import { PresentationRegion } from "./presentation/PresentationRegion";
 import { createDemoPresentationState } from "./presentation/demoState";
 import { resolveTimedPresentationEvent } from "./presentation/cues";
+import { PersistentRevisionGate } from "./presentation/persistentRevision";
 import { ViewerShell, type ViewerProfile } from "./viewer/ViewerShell";
 
 function deltaClass(delta: number | null): string {
@@ -21,17 +22,28 @@ function ViewerExperience() {
   const [profile, setProfile] = useState<ViewerProfile>("desktop");
   const rehearsal = new URLSearchParams(window.location.search).get("rehearsal") === "1";
   const { applyCommand, expireAt, replaceState } = usePresentation();
+  const revisionGate = useRef(new PersistentRevisionGate());
+  const hydrateSnapshot = useCallback(() => {
+    return fetch("/api/presentation/snapshot")
+      .then((response) => response.ok ? response.json() as Promise<PresentationSnapshot> : Promise.reject(new Error("snapshot unavailable")))
+      .then((snapshot) => {
+        if (revisionGate.current.applySnapshot(snapshot)) replaceState(snapshot.state);
+      });
+  }, [replaceState]);
   useEffect(() => {
     let active = true;
-    fetch("/api/presentation/snapshot")
-      .then((response) => response.ok ? response.json() as Promise<PresentationSnapshot> : Promise.reject(new Error("snapshot unavailable")))
-      .then((snapshot) => { if (active) replaceState(snapshot.state); })
+    hydrateSnapshot()
+      .then(() => { if (!active) return; })
       .catch(() => { /* The baseline remains available if the API is temporarily unreachable. */ });
     return () => { active = false; };
-  }, [replaceState]);
+  }, [hydrateSnapshot]);
   const onTimedEvent = useCallback((event: ShowGatherEvent, targetPts: number) => {
-    resolveTimedPresentationEvent(event, targetPts).forEach(applyCommand);
-  }, [applyCommand]);
+    const decision = revisionGate.current.applyEvent(event.r);
+    if (decision.needsRecovery) hydrateSnapshot().catch(() => {});
+    resolveTimedPresentationEvent(event, targetPts)
+      .filter((command) => decision.applyPersistent || (command.action === "activate" && command.durationMs !== undefined))
+      .forEach(applyCommand);
+  }, [applyCommand, hydrateSnapshot]);
   const { overlays, syncLog, status } = useSyncClient(videoRef, { onTimedEvent, onMediaTime: expireAt, rehearsal });
 
   const video = <div className="video-container">

@@ -19,6 +19,8 @@ export interface OverlayShowEvent {
   v: 1;
   /** Unique event ID for deduplication. */
   id: string;
+  /** Persistent presentation revision when this event changes durable state. */
+  r?: number;
   /** Event type. POC supports "overlay.show". */
   t: "overlay.show";
   /** Payload — the display data. */
@@ -36,6 +38,7 @@ export interface OverlayShowEvent {
 export interface PresentationCueEvent {
   v: 1;
   id: string;
+  r?: number;
   t: "presentation.cue";
   p: {
     cue: PresentationCueKey;
@@ -48,6 +51,7 @@ export interface PresentationCueEvent {
 export interface PresentationClearEvent {
   v: 1;
   id: string;
+  r?: number;
   t: "presentation.clear";
   p: Record<string, never>;
 }
@@ -74,13 +78,14 @@ export function validateEvent(data: unknown): ShowGatherEvent | null {
 
   if (obj.v !== 1) return null;
   if (typeof obj.id !== "string" || obj.id.length === 0) return null;
+  if (obj.r !== undefined && (!Number.isSafeInteger(obj.r) || (obj.r as number) <= 0)) return null;
   if (obj.t !== "overlay.show" && obj.t !== "presentation.cue" && obj.t !== "presentation.clear") return null;
 
   const p = obj.p;
   if (typeof p !== "object" || p === null) return null;
   const payload = p as Record<string, unknown>;
   if (obj.t === "presentation.clear") {
-    return { v: 1, id: obj.id as string, t: "presentation.clear", p: {} };
+    return { v: 1, id: obj.id as string, ...(obj.r !== undefined ? { r: obj.r as number } : {}), t: "presentation.clear", p: {} };
   }
 
   if (obj.t === "presentation.cue") {
@@ -89,6 +94,7 @@ export function validateEvent(data: unknown): ShowGatherEvent | null {
     return {
       v: 1,
       id: obj.id as string,
+      ...(obj.r !== undefined ? { r: obj.r as number } : {}),
       t: "presentation.cue",
       p: {
         cue: payload.cue,
@@ -103,6 +109,7 @@ export function validateEvent(data: unknown): ShowGatherEvent | null {
   return {
     v: 1,
     id: obj.id as string,
+    ...(obj.r !== undefined ? { r: obj.r as number } : {}),
     t: "overlay.show",
     p: {
       title: payload.title as string,

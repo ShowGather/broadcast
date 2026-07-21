@@ -26,3 +26,17 @@ test("duplicate events are idempotent and safe clear is reflected in the snapsho
   assert.equal(resolvePresentationRegion(channel.snapshot().state, "video.overlay").length, 0);
   assert.equal(resolvePresentationRegion(channel.snapshot().state, "footer").length, 0);
 });
+
+test("revisions are assigned monotonically and clear followed by cue has deterministic state", () => {
+  const channel = new ChannelPresentationState();
+  const clear = channel.withRevision({ v: 1, id: "clear-1", t: "presentation.clear", p: {} });
+  assert.equal(clear.r, 1);
+  assert.equal(channel.apply(clear), true);
+
+  const goal = channel.withRevision({ v: 1, id: "goal-2", t: "presentation.cue", p: { cue: "goal-home" } });
+  assert.equal(goal.r, 2);
+  assert.equal(channel.apply(goal), true);
+  const visible = resolvePresentationRegion(channel.snapshot().state, "video.overlay");
+  assert.equal(visible.length, 1);
+  assert.equal(visible[0]?.eventId, "goal-2:score");
+});
