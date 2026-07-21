@@ -21,3 +21,11 @@ test("safe clear produces a global presentation clear command", () => {
     { action: "clear", eventId: "evt-clear", targetPts: 30 },
   ]);
 });
+
+test("configurable score command resolves to durable scorebug data", () => {
+  const commands = resolveTimedPresentationEvent({ v: 1, id: "evt-score", r: 3, t: "pc", p: { k: "score", h: 2, a: 0, l: "GOAL" } }, 42);
+  assert.deepEqual(commands, [{
+    action: "activate", eventId: "evt-score:score", targetPts: 42, region: "video.overlay", layer: "scorebug", priority: 10,
+    item: { kind: "scorebug", homeTeam: "HOME", homeScore: "2", awayTeam: "AWAY", awayScore: "0", clock: "GOAL" },
+  }]);
+});

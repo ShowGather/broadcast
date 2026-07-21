@@ -1,4 +1,4 @@
-import { resolvePresentationCue, type PresentationCommand } from "@showgather/presentation-model";
+import { resolvePresentationCommand, resolvePresentationCue, type PresentationCommand } from "@showgather/presentation-model";
 import type { ShowGatherEvent } from "@showgather/event-schema";
 
 export { resolvePresentationCue } from "@showgather/presentation-model";
@@ -7,5 +7,6 @@ export function resolveTimedPresentationEvent(event: ShowGatherEvent, targetPts:
   if (event.t === "presentation.clear") {
     return [{ action: "clear", eventId: event.id, targetPts }];
   }
+  if (event.t === "pc") return resolvePresentationCommand(event, targetPts);
   return event.t === "presentation.cue" ? resolvePresentationCue(event, targetPts) : [];
 }

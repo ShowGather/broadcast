@@ -40,3 +40,12 @@ test("revisions are assigned monotonically and clear followed by cue has determi
   assert.equal(visible.length, 1);
   assert.equal(visible[0]?.eventId, "goal-2:score");
 });
+
+test("configurable durable commands become late-join snapshot state", () => {
+  const channel = new ChannelPresentationState();
+  const ticker = channel.withRevision({ v: 1, id: "ticker-1", t: "pc", p: { k: "ticker", l: "LIVE", t: "Second half" } });
+  assert.equal(ticker.r, 1);
+  channel.apply(ticker);
+  const footer = resolvePresentationRegion(channel.snapshot().state, "footer");
+  assert.equal((footer[0]?.item as { text: string }).text, "Second half");
+});

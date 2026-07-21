@@ -15,6 +15,16 @@ test("rejects an invalid persistent revision", () => {
   assert.equal(validateEvent({ v: 1, id: "evt-bad-revision", r: 0, t: "presentation.cue", p: { cue: "goal-home" } }), null);
 });
 
+test("accepts a compact configurable score command", () => {
+  assert.deepEqual(validateEvent({ v: 1, id: "evt-score", r: 8, t: "pc", p: { k: "score", h: 2, a: 0, l: "GOAL" } }), {
+    v: 1, id: "evt-score", r: 8, t: "pc", p: { k: "score", h: 2, a: 0, l: "GOAL" },
+  });
+});
+
+test("rejects a configurable command that exceeds compact text bounds", () => {
+  assert.equal(validateEvent({ v: 1, id: "evt-long", t: "pc", p: { k: "ticker", t: "x".repeat(21) } }), null);
+});
+
 test("accepts a compact presentation safe clear", () => {
   assert.deepEqual(validateEvent({ v: 1, id: "evt-clear", t: "presentation.clear", p: {} }), {
     v: 1, id: "evt-clear", t: "presentation.clear", p: {},
@@ -23,5 +33,10 @@ test("accepts a compact presentation safe clear", () => {
 
 test("keeps a goal cue within the POC ID3 payload limit", () => {
   const encoded = encodeEvent({ v: 1, id: "evt-abcdefgh", r: 999, t: "presentation.cue", p: { cue: "goal-home", dur: 15_000 } });
+  assert.ok(new TextEncoder().encode(encoded).byteLength <= 127);
+});
+
+test("keeps a maximal configurable alert within the POC ID3 payload limit", () => {
+  const encoded = encodeEvent({ v: 1, id: "evt-abcdefgh", t: "pc", p: { k: "alert", t: "x".repeat(20), m: "y".repeat(20), x: "c", d: 8_000 } });
   assert.ok(new TextEncoder().encode(encoded).byteLength <= 127);
 });

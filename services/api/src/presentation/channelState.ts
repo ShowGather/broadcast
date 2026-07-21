@@ -2,6 +2,7 @@ import {
   applyPresentationCommand,
   createPersistentPresentationSnapshot,
   createV1PresentationBaseline,
+  resolvePresentationCommand,
   resolvePresentationCue,
   type PresentationSnapshot,
   type PresentationState,
@@ -39,6 +40,14 @@ export class ChannelPresentationState {
       this.revision += 1;
       return true;
     }
+    if (event.t === "pc") {
+      for (const command of resolvePresentationCommand(event, this.revision + 1)) {
+        if (command.action === "activate" && command.durationMs !== undefined) continue;
+        this.state = applyPresentationCommand(this.state, command);
+      }
+      this.revision += 1;
+      return true;
+    }
     if (event.t !== "presentation.cue") return false;
     // Snapshot entries need a deterministic ordering even though their source
     // PTS is only known at the browser. Revision is a local durable ordering.
@@ -59,6 +68,11 @@ export class ChannelPresentationState {
       event.t === "presentation.cue" &&
       resolvePresentationCue(event, this.revision + 1).some(
         (command) => command.action === "activate" && command.durationMs === undefined
+      )
+    ) || (
+      event.t === "pc" &&
+      resolvePresentationCommand(event, this.revision + 1).some(
+        (command) => command.action === "clear" || (command.action === "activate" && command.durationMs === undefined)
       )
     );
   }

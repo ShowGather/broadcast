@@ -234,3 +234,4 @@ function mapRegions(
 }
 
 export { resolvePresentationCue, type PresentationCueInput, type PresentationCueKey } from "./cues.js";
+export { resolvePresentationCommand, type PresentationCommandInput, type PresentationCommandPayload } from "./commands.js";

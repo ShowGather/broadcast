@@ -56,7 +56,25 @@ export interface PresentationClearEvent {
   p: Record<string, never>;
 }
 
-export type ShowGatherEvent = OverlayShowEvent | PresentationCueEvent | PresentationClearEvent;
+/** Compact, configurable command payload carried directly in timed metadata. */
+export type PresentationCommandPayload =
+  | { k: "score"; h: number; a: number; l?: string }
+  | { k: "lower"; t: string; s?: string; d?: number }
+  | { k: "alert"; t: string; m: string; x?: "i" | "w" | "c"; d?: number }
+  | { k: "sponsor"; b: string; s?: string; d?: number }
+  | { k: "ticker"; t: string; l?: string }
+  | { k: "clear"; g?: "v" | "h" | "l" | "r" | "f"; y?: string };
+
+export interface PresentationCommandEvent {
+  v: 1;
+  id: string;
+  r?: number;
+  /** Compact timed-transport type for a canonical presentation command. */
+  t: "pc";
+  p: PresentationCommandPayload;
+}
+
+export type ShowGatherEvent = OverlayShowEvent | PresentationCueEvent | PresentationClearEvent | PresentationCommandEvent;
 
 export const PRESENTATION_CUE_KEYS: readonly PresentationCueKey[] = [
   "goal-home",
@@ -79,7 +97,7 @@ export function validateEvent(data: unknown): ShowGatherEvent | null {
   if (obj.v !== 1) return null;
   if (typeof obj.id !== "string" || obj.id.length === 0) return null;
   if (obj.r !== undefined && (!Number.isSafeInteger(obj.r) || (obj.r as number) <= 0)) return null;
-  if (obj.t !== "overlay.show" && obj.t !== "presentation.cue" && obj.t !== "presentation.clear") return null;
+  if (obj.t !== "overlay.show" && obj.t !== "presentation.cue" && obj.t !== "presentation.clear" && obj.t !== "pc") return null;
 
   const p = obj.p;
   if (typeof p !== "object" || p === null) return null;
@@ -103,6 +121,11 @@ export function validateEvent(data: unknown): ShowGatherEvent | null {
     };
   }
 
+  if (obj.t === "pc") {
+    const command = validatePresentationCommandPayload(payload);
+    return command === null ? null : { v: 1, id: obj.id as string, ...(obj.r !== undefined ? { r: obj.r as number } : {}), t: "pc", p: command };
+  }
+
   if (typeof payload.title !== "string" || payload.title.length === 0) return null;
   if (typeof payload.dur !== "number" || payload.dur <= 0) return null;
 
@@ -117,6 +140,48 @@ export function validateEvent(data: unknown): ShowGatherEvent | null {
       dur: payload.dur as number,
     },
   };
+}
+
+export function validatePresentationCommandPayload(data: unknown): PresentationCommandPayload | null {
+  if (typeof data !== "object" || data === null) return null;
+  const p = data as Record<string, unknown>;
+  const duration = validDuration(p.d) ? p.d : undefined;
+  if (p.d !== undefined && duration === undefined) return null;
+  switch (p.k) {
+    case "score":
+      return validScore(p.h) && validScore(p.a) && optionalText(p.l, 12)
+        ? { k: "score", h: p.h, a: p.a, ...(typeof p.l === "string" ? { l: p.l } : {}) } : null;
+    case "lower":
+      return text(p.t, 20) && optionalText(p.s, 20)
+        ? { k: "lower", t: p.t, ...(typeof p.s === "string" ? { s: p.s } : {}), ...(duration !== undefined ? { d: duration } : {}) } : null;
+    case "alert":
+      return text(p.t, 20) && text(p.m, 20) && (p.x === undefined || p.x === "i" || p.x === "w" || p.x === "c")
+        ? { k: "alert", t: p.t, m: p.m, ...(p.x !== undefined ? { x: p.x } : {}), ...(duration !== undefined ? { d: duration } : {}) } : null;
+    case "sponsor":
+      return text(p.b, 20) && optionalText(p.s, 20)
+        ? { k: "sponsor", b: p.b, ...(typeof p.s === "string" ? { s: p.s } : {}), ...(duration !== undefined ? { d: duration } : {}) } : null;
+    case "ticker":
+      return text(p.t, 20) && optionalText(p.l, 12)
+        ? { k: "ticker", t: p.t, ...(typeof p.l === "string" ? { l: p.l } : {}) } : null;
+    case "clear":
+      return (p.g === undefined || p.g === "v" || p.g === "h" || p.g === "l" || p.g === "r" || p.g === "f") && optionalText(p.y, 16)
+        ? { k: "clear", ...(p.g !== undefined ? { g: p.g } : {}), ...(typeof p.y === "string" ? { y: p.y } : {}) } : null;
+    default:
+      return null;
+  }
+}
+
+function text(value: unknown, maxBytes: number): value is string {
+  return typeof value === "string" && value.length > 0 && new TextEncoder().encode(value).byteLength <= maxBytes;
+}
+function optionalText(value: unknown, maxBytes: number): boolean {
+  return value === undefined || text(value, maxBytes);
+}
+function validDuration(value: unknown): value is number {
+  return typeof value === "number" && Number.isSafeInteger(value) && value > 0;
+}
+function validScore(value: unknown): value is number {
+  return typeof value === "number" && Number.isSafeInteger(value) && value >= 0 && value <= 999;
 }
 
 /**

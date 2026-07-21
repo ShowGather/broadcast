@@ -3,7 +3,9 @@ import {
   generateEventId,
   encodeEvent,
   isPresentationCueKey,
+  validatePresentationCommandPayload,
   type PresentationCueKey,
+  type PresentationCommandPayload,
   type ShowGatherEvent,
 } from "@showgather/event-schema";
 import { encodeTpe1Frame } from "@showgather/id3";
@@ -19,6 +21,7 @@ export interface EventRequest {
   durationMs?: number;
   cue?: PresentationCueKey;
   action?: "safe-clear";
+  command?: PresentationCommandPayload;
 }
 
 interface StoredEvent {
@@ -33,7 +36,7 @@ const channelPresentation = new ChannelPresentationState();
 let dispatchTail: Promise<void> = Promise.resolve();
 
 export function createEvent(body: EventRequest): { event: ShowGatherEvent } | { error: string } {
-  const { title, message, durationMs, cue, action } = body;
+  const { title, message, durationMs, cue, action, command } = body;
 
   if (action === "safe-clear") {
     return { event: { v: 1, id: generateEventId(), t: "presentation.clear", p: {} } };
@@ -44,6 +47,11 @@ export function createEvent(body: EventRequest): { event: ShowGatherEvent } | { 
       return { error: "durationMs must be a positive number when supplied" };
     }
     return { event: { v: 1, id: generateEventId(), t: "presentation.cue", p: { cue, ...(durationMs !== undefined ? { dur: durationMs } : {}) } } };
+  }
+  if (command !== undefined) {
+    const payload = validatePresentationCommandPayload(command);
+    if (payload === null) return { error: "command must be a supported compact presentation command" };
+    return { event: { v: 1, id: generateEventId(), t: "pc", p: payload } };
   }
   if (typeof title !== "string" || title.trim().length === 0) return { error: "title must be a non-empty string" };
   if (typeof durationMs !== "number" || durationMs <= 0) return { error: "durationMs must be a positive number" };

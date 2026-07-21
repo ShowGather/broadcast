@@ -7,6 +7,7 @@ interface StoredEvent {
 
 function eventLabel(event: StoredEvent["event"]) {
   if (event.t === "presentation.cue") return `Cue: ${event.p.cue ?? "unknown"}`;
+  if (event.t === "pc") return `Command: ${event.p.k ?? "unknown"}`;
   if (event.t === "presentation.clear") return "Safe Clear";
   return String(event.p.title ?? "Overlay");
 }
@@ -19,6 +20,11 @@ export default function App() {
   const [status, setStatus] = useState("");
   const [error, setError] = useState("");
   const [rehearsal, setRehearsal] = useState(false);
+  const [commandKind, setCommandKind] = useState("score");
+  const [primary, setPrimary] = useState("");
+  const [secondary, setSecondary] = useState("");
+  const [label, setLabel] = useState("");
+  const [commandDuration, setCommandDuration] = useState(8000);
 
   const fetchEvents = useCallback(async () => {
     try {
@@ -46,6 +52,17 @@ export default function App() {
     }
   };
 
+  const sendCommand = () => {
+    const duration = Number.isFinite(commandDuration) && commandDuration > 0 ? commandDuration : undefined;
+    const command = commandKind === "score" ? { k: "score", h: Number(primary), a: Number(secondary), ...(label.trim() ? { l: label.trim() } : {}) }
+      : commandKind === "lower" ? { k: "lower", t: primary.trim(), ...(secondary.trim() ? { s: secondary.trim() } : {}), ...(duration ? { d: duration } : {}) }
+      : commandKind === "alert" ? { k: "alert", t: primary.trim(), m: secondary.trim(), x: "w", ...(duration ? { d: duration } : {}) }
+      : commandKind === "sponsor" ? { k: "sponsor", b: primary.trim(), ...(secondary.trim() ? { s: secondary.trim() } : {}), ...(duration ? { d: duration } : {}) }
+      : commandKind === "ticker" ? { k: "ticker", t: primary.trim(), ...(label.trim() ? { l: label.trim() } : {}) }
+      : { k: "clear", ...(primary ? { g: primary } : {}), ...(secondary.trim() ? { y: secondary.trim() } : {}) };
+    send({ command }, `${commandKind} command sent`);
+  };
+
   return <div className="container">
     <header className="header"><h1>ShowGather Broadcast — Control</h1><p>{rehearsal ? "Rehearsal cues go only to opted-in preview players." : "Live controls send compact, timed metadata to the HLS pipeline."}</p>
       <button className={`mode-toggle ${rehearsal ? "rehearsal" : ""}`} onClick={() => setRehearsal((current) => !current)}>{rehearsal ? "🟡 Rehearsal mode" : "🔴 Live mode"}</button>
@@ -60,6 +77,20 @@ export default function App() {
         <button className="safe-clear" onClick={() => send({ action: "safe-clear" }, "Safe Clear sent")}>✕ Safe Clear</button>
       </div>
       <p className="hint">Safe Clear removes presentation only. The programme video continues uninterrupted.</p>
+    </section>
+
+    <section className="section">
+      <h2>Configurable presentation command</h2>
+      <div className="form">
+        <label><span>Action</span><select value={commandKind} onChange={(event) => { setCommandKind(event.target.value); setPrimary(""); setSecondary(""); setLabel(""); }}>
+          <option value="score">Score update</option><option value="lower">Lower third</option><option value="alert">Alert</option><option value="sponsor">Sponsor takeover</option><option value="ticker">Ticker update</option><option value="clear">Regional clear</option>
+        </select></label>
+        {commandKind === "score" ? <><label><span>Home score</span><input type="number" min={0} max={999} value={primary} onChange={(event) => setPrimary(event.target.value)} /></label><label><span>Away score</span><input type="number" min={0} max={999} value={secondary} onChange={(event) => setSecondary(event.target.value)} /></label><label><span>Label</span><input value={label} maxLength={12} onChange={(event) => setLabel(event.target.value)} placeholder="GOAL" /></label></>
+          : commandKind === "clear" ? <><label><span>Region</span><select value={primary} onChange={(event) => setPrimary(event.target.value)}><option value="">All regions</option><option value="v">Video overlay</option><option value="h">Header</option><option value="l">Left rail</option><option value="r">Right rail</option><option value="f">Footer</option></select></label><label><span>Layer (optional)</span><input value={secondary} maxLength={16} onChange={(event) => setSecondary(event.target.value)} placeholder="primary" /></label></>
+          : <><label><span>{commandKind === "sponsor" ? "Brand" : commandKind === "ticker" ? "Ticker text" : "Title"}</span><input value={primary} maxLength={20} onChange={(event) => setPrimary(event.target.value)} /></label>{commandKind !== "ticker" && <label><span>{commandKind === "alert" ? "Message" : "Subtitle / tagline"}</span><input value={secondary} maxLength={20} onChange={(event) => setSecondary(event.target.value)} /></label>}{commandKind === "ticker" && <label><span>Label</span><input value={label} maxLength={12} onChange={(event) => setLabel(event.target.value)} /></label>}{commandKind !== "ticker" && <label><span>Duration (ms)</span><input type="number" min={1000} step={1000} value={commandDuration} onChange={(event) => setCommandDuration(Number(event.target.value))} /></label>}</>}
+        <button onClick={sendCommand}>Send configurable command</button>
+      </div>
+      <p className="hint">Text is byte-bounded for the compact timed-ID3 envelope. Score, ticker, persistent sponsor, and clear update the late-join snapshot.</p>
     </section>
 
     <section className="section">
