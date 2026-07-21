@@ -13,10 +13,11 @@ export function InteractivePanels() {
   const { state } = usePresentation();
   const overlay = resolvePresentationRegion(state, "video.overlay").map((entry) => entry.item);
   const header = resolvePresentationRegion(state, "header").map((entry) => entry.item);
+  const footer = resolvePresentationRegion(state, "footer").map((entry) => entry.item);
   const rails = ["left.rail", "right.rail"] as const;
   const sponsors = rails.flatMap((region) => resolvePresentationRegion(state, region).map((entry) => entry.item)).filter((item) => item.kind === "sponsor-panel");
   const score = first(overlay, "scorebug");
-  const ticker = first(header, "ticker");
+  const ticker = first(footer, "ticker") ?? first(header, "ticker");
 
   return <section className="interactive-panels" aria-label="Live companion panels">
     <div className="interactive-panels__tabs">
