@@ -50,3 +50,9 @@ Switch Admin to rehearsal mode and use the same rundown. Only the viewer opened 
 ## Pilot labelling
 
 The timing diagnostics panel, test stream, named legacy cues, and rehearsal SSE channel are V1 validation tools, not production broadcast controls. The Compose stack is a local demonstration environment only.
+
+## Captured local pilot evidence
+
+![Admin rundown and API connection state](screenshots/admin-rundown.png)
+
+![Mobile companion panel using live presentation state](screenshots/mobile-companion.png)
