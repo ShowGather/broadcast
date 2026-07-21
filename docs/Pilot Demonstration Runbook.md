@@ -11,8 +11,10 @@ pnpm pilot:up
 Wait for `http://localhost:3001/api/health` to return `status: ok`, then open:
 
 - Admin: `http://localhost:3002`
-- Viewer: `http://localhost:3003`
-- Rehearsal viewer: `http://localhost:3003/?rehearsal=1`
+- Desktop viewer: `http://localhost:3003`
+- Mobile companion viewer: `http://localhost:3003/?profile=mobile`
+- TV viewer: `http://localhost:3003/?profile=tv`
+- Rehearsal mobile viewer: `http://localhost:3003/?profile=mobile&rehearsal=1`
 
 Stop the local stack with `pnpm pilot:down`.
 
