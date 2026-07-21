@@ -19,7 +19,8 @@ function deltaClass(delta: number | null): string {
 
 function ViewerExperience() {
   const videoRef = useRef<HTMLVideoElement>(null);
-  const [profile, setProfile] = useState<ViewerProfile>("desktop");
+  const requestedProfile = new URLSearchParams(window.location.search).get("profile");
+  const [profile, setProfile] = useState<ViewerProfile>(requestedProfile === "mobile" || requestedProfile === "tv" ? requestedProfile : "desktop");
   const rehearsal = new URLSearchParams(window.location.search).get("rehearsal") === "1";
   const { applyCommand, expireAt, replaceState } = usePresentation();
   const revisionGate = useRef(new PersistentRevisionGate());
