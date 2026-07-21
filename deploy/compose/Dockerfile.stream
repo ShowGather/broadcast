@@ -1,0 +1,35 @@
+FROM golang:1.24-bookworm AS builder
+RUN go install github.com/jobl/id3injector@latest
+
+FROM debian:bookworm-slim AS base
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    ffmpeg \
+    curl \
+    ca-certificates \
+    && rm -rf /var/lib/apt/lists/*
+
+COPY --from=builder /go/bin/id3injector /usr/local/bin/id3injector
+
+# --- build the ts-segmenter from the monorepo source ---
+FROM golang:1.24-bookworm AS segbuilder
+WORKDIR /src
+COPY services/ts-segmenter/ .
+RUN go build -o /usr/local/bin/ts-segmenter .
+
+FROM base
+COPY --from=segbuilder /usr/local/bin/ts-segmenter /usr/local/bin/ts-segmenter
+
+RUN mkdir -p /hls
+WORKDIR /app
+COPY stream/scripts/generate-test-stream.sh .
+RUN chmod +x generate-test-stream.sh
+
+ENV ID3_INJECTOR=/usr/local/bin/id3injector
+ENV TS_SEGMENTER=/usr/local/bin/ts-segmenter
+ENV ID3_LISTEN=:8080
+ENV HLS_TIME=2
+ENV SEG_MAX=10
+
+EXPOSE 8080
+
+CMD ["./generate-test-stream.sh"]

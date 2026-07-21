@@ -1,0 +1,80 @@
+services:
+  stream:
+    build:
+      context: ../..
+      dockerfile: deploy/compose/Dockerfile.stream
+    ports:
+      - "8080:8080"
+    volumes:
+      - hls-data:/hls
+    healthcheck:
+      test: ["CMD", "test", "-f", "/hls/stream.m3u8"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+      start_period: 10s
+    restart: unless-stopped
+
+  hls-server:
+    build:
+      context: ../..
+      dockerfile: deploy/compose/Dockerfile.hls
+    ports:
+      - "8000:80"
+    volumes:
+      - hls-data:/data/hls:ro
+    depends_on:
+      stream:
+        condition: service_healthy
+    restart: unless-stopped
+
+  api:
+    build:
+      context: ../..
+      dockerfile: deploy/compose/Dockerfile.api
+    ports:
+      - "3001:3001"
+    environment:
+      ID3_INJECTOR_HOST: stream
+      ID3_INJECTOR_PORT: "8080"
+    depends_on:
+      stream:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "node -e \"fetch('http://localhost:3001/api/health').then(r=>{if(!r.ok)throw 1}).catch(()=>process.exit(1))\""]
+      interval: 5s
+      timeout: 3s
+      retries: 3
+      start_period: 5s
+    restart: unless-stopped
+
+  admin:
+    build:
+      context: ../..
+      dockerfile: deploy/compose/Dockerfile.admin
+    ports:
+      - "3002:3002"
+    environment:
+      API_URL: http://api:3001
+    depends_on:
+      api:
+        condition: service_healthy
+    restart: unless-stopped
+
+  player:
+    build:
+      context: ../..
+      dockerfile: deploy/compose/Dockerfile.player
+    ports:
+      - "3003:3003"
+    environment:
+      API_URL: http://api:3001
+    depends_on:
+      api:
+        condition: service_healthy
+      hls-server:
+        condition: service_started
+    restart: unless-stopped
+
+volumes:
+  hls-data:

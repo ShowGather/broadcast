@@ -1,0 +1,87 @@
+/**
+ * ShowGather Event Schema — POC version
+ *
+ * Compact JSON format designed to fit within id3injector's TPE1 frame limit (127 bytes text content).
+ * The entire JSON payload is encoded as the TPE1 text in an ID3v2.4 tag.
+ */
+
+/** Maximum bytes allowed for the TPE1 text payload (set by id3injector). */
+export const MAX_PAYLOAD_BYTES = 127;
+
+/**
+ * A ShowGather sync event.
+ * This is the wire format encoded into ID3 TPE1 frames.
+ */
+export interface ShowGatherEvent {
+  /** Schema version. Always 1 for POC. */
+  v: 1;
+  /** Unique event ID for deduplication. */
+  id: string;
+  /** Event type. POC supports "overlay.show". */
+  t: "overlay.show";
+  /** Payload — the display data. */
+  p: {
+    /** Title text (required). */
+    title: string;
+    /** Optional message body. */
+    msg?: string;
+    /** Duration in milliseconds before auto-hide. */
+    dur: number;
+  };
+}
+
+/**
+ * Validate that a parsed object is a valid ShowGatherEvent.
+ * Returns the event if valid, null otherwise.
+ */
+export function validateEvent(data: unknown): ShowGatherEvent | null {
+  if (typeof data !== "object" || data === null) return null;
+  const obj = data as Record<string, unknown>;
+
+  if (obj.v !== 1) return null;
+  if (typeof obj.id !== "string" || obj.id.length === 0) return null;
+  if (obj.t !== "overlay.show") return null;
+
+  const p = obj.p;
+  if (typeof p !== "object" || p === null) return null;
+  const payload = p as Record<string, unknown>;
+  if (typeof payload.title !== "string" || payload.title.length === 0) return null;
+  if (typeof payload.dur !== "number" || payload.dur <= 0) return null;
+
+  return {
+    v: 1,
+    id: obj.id as string,
+    t: "overlay.show",
+    p: {
+      title: payload.title as string,
+      msg: typeof payload.msg === "string" ? payload.msg : undefined,
+      dur: payload.dur as number,
+    },
+  };
+}
+
+/**
+ * Encode a ShowGatherEvent to a JSON string suitable for TPE1 injection.
+ * Throws if the payload exceeds MAX_PAYLOAD_BYTES.
+ */
+export function encodeEvent(event: ShowGatherEvent): string {
+  const json = JSON.stringify(event);
+  if (new TextEncoder().encode(json).byteLength > MAX_PAYLOAD_BYTES) {
+    throw new Error(
+      `Event payload exceeds ${MAX_PAYLOAD_BYTES} bytes (${new TextEncoder().encode(json).byteLength} bytes)`
+    );
+  }
+  return json;
+}
+
+/**
+ * Generate a unique event ID.
+ */
+export function generateEventId(): string {
+  const chars = "abcdefghijklmnopqrstuvwxyz0123456789";
+  let id = "evt-";
+  for (let i = 0; i < 8; i++) {
+    id += chars[Math.floor(Math.random() * chars.length)];
+  }
+  return id;
+}
