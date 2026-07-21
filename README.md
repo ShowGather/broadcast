@@ -50,6 +50,14 @@ cd deploy/compose
 docker compose up --build
 ```
 
+### Pilot demonstration (recommended)
+
+```bash
+pnpm pilot:up
+```
+
+This starts the complete local Compose stack in the background. See [docs/Pilot Demonstration Runbook.md](docs/Pilot%20Demonstration%20Runbook.md) for the repeatable rundown, rehearsal flow, and manual checks.
+
 ## URLs
 
 | Service | URL |

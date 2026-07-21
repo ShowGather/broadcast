@@ -12,6 +12,8 @@
     "build": "pnpm --filter @showgather/event-schema build && pnpm --filter @showgather/id3 build && pnpm --filter @showgather/presentation-model build && pnpm --filter @showgather/api build && pnpm --filter @showgather/admin build && pnpm --filter @showgather/player build",
     "typecheck": "pnpm -r run typecheck",
     "stream": "bash stream/scripts/generate-test-stream.sh",
-    "verify": "bash stream/scripts/verify-segments.sh"
+    "verify": "bash stream/scripts/verify-segments.sh",
+    "pilot:up": "docker compose -f deploy/compose/docker-compose.yml up --build -d",
+    "pilot:down": "docker compose -f deploy/compose/docker-compose.yml down"
   }
 }
