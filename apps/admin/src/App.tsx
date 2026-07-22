@@ -39,6 +39,7 @@ export default function App() {
   const [streamConnection, setStreamConnection] = useState<"checking" | "connected" | "offline">("checking");
   const [runReady, setRunReady] = useState(false);
   const [runCueIndex, setRunCueIndex] = useState(0);
+  const [previewProfile, setPreviewProfile] = useState<"desktop" | "mobile" | "tv">("desktop");
   const [channels, setChannels] = useState<Channel[]>([]);
   const [productions, setProductions] = useState<Production[]>([]);
   const [rundowns, setRundowns] = useState<Rundown[]>([]);
@@ -251,7 +252,7 @@ export default function App() {
   };
 
   const selectedProduction = productions.find((production) => production.id === productionId);
-  const playerPreviewUrl = channelId ? `${window.location.protocol}//${window.location.hostname}:3003/player/${encodeURIComponent(channelId)}?profile=desktop&rehearsal=1&embedded=1&productionId=${encodeURIComponent(productionId)}` : "";
+  const playerPreviewUrl = channelId ? `${window.location.protocol}//${window.location.hostname}:3003/player/${encodeURIComponent(channelId)}?profile=${previewProfile}&rehearsal=1&embedded=1&productionId=${encodeURIComponent(productionId)}` : "";
   const programmePreviewUrl = channelId ? `${window.location.protocol}//${window.location.hostname}:3003/player/${encodeURIComponent(channelId)}?profile=desktop&embedded=1&productionId=${encodeURIComponent(productionId)}` : "";
   const disabledCueCount = rundown.filter((cue) => !cue.enabled).length;
   const unresolvedOutbox = outbox.filter((item) => item.status === "failed" || item.status === "pending");
@@ -313,8 +314,8 @@ export default function App() {
     </section></>}
 
     {workspace === "rehearse" && <section className="section rehearsal-preview">
-      <h2>Rehearsal preview</h2><p className="hint">This embeds the real Player in rehearsal mode. It never sends rehearsal cues to the live stream.</p>
-      {playerPreviewUrl ? <iframe title="Rehearsal Player preview" src={playerPreviewUrl} className="player-preview" /> : <p className="empty">Choose a channel to load the preview.</p>}
+      <div className="workspace-heading"><div><h2>Rehearsal preview</h2><p className="hint">This embeds the real Player in rehearsal mode. It never sends rehearsal cues to the live stream.</p></div><div className="profile-picker" role="group" aria-label="Preview profile">{(["desktop", "mobile", "tv"] as const).map((profile) => <button key={profile} className={previewProfile === profile ? "active" : ""} onClick={() => setPreviewProfile(profile)}>{profile}</button>)}</div></div>
+      {playerPreviewUrl ? <iframe title={`Rehearsal Player ${previewProfile} preview`} src={playerPreviewUrl} className={`player-preview player-preview--${previewProfile}`} /> : <p className="empty">Choose a channel to load the preview.</p>}
     </section>}
 
     {workspace === "run" && !runReady && <section className="section run-entry" aria-labelledby="run-entry-title">
@@ -348,7 +349,7 @@ export default function App() {
     {workspace === "rehearse" && <section className="section">
       <h2>Rundown — {rehearsal ? "Rehearsal" : "Live"}</h2>
       <p className="hint">GO uses an idempotent execution ID. Completed cues require explicit re-run; rehearsal state is separate from live.</p>
-      <button disabled={!rundownId} onClick={() => mutate(`/api/rundown/${rehearsal ? "rehearsal" : "live"}/sessions?rundownId=${encodeURIComponent(rundownId)}`, "POST", {}, `${rehearsal ? "Rehearsal" : "Live"} session started`, fetchRundown)}>Start new {rehearsal ? "rehearsal" : "live"} session</button>
+      <button disabled={!rundownId} onClick={() => mutate(`/api/rundown/${rehearsal ? "rehearsal" : "live"}/sessions?rundownId=${encodeURIComponent(rundownId)}`, "POST", {}, `${rehearsal ? "Rehearsal" : "Live"} session started`, fetchRundown)}>{rehearsal ? "Reset rehearsal session" : "Start new live session"}</button>
       <div className="cue-grid">
         {rundown.map((cue) => <div key={cue.id}><strong>{cue.order}. {cue.label}</strong><span className="hint"> {cue.status}</span><button disabled={cue.status === "active" || cue.status === "cancelled"} onClick={() => goCue(cue)}>{cue.status === "failed" ? "Retry" : "GO"}</button>{cue.status === "complete" && <button onClick={() => goCue(cue, true)}>Re-run</button>}</div>)}
       </div>
