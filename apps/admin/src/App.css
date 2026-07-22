@@ -23,6 +23,7 @@ body {
 .admin-context { padding: 16px; border: 1px solid #2a3445; border-radius: 10px; background: #121a26; }.admin-context .form { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; }.admin-context .form select { width: 100%; }
 .workspace--rehearse .admin-shell__header { border-color: #8c7028; }.workspace--rehearse .admin-shell__nav { border-color: #8c7028; background: #211d13; }.workspace--run .admin-shell__header { border-color: #8e3939; }.workspace--run .admin-shell__nav { border-color: #8e3939; background: #241619; }
 .rehearsal-preview { padding: 16px; border: 1px solid #8c7028; border-radius: 10px; background: #1e1a11; }.player-preview { display: block; width: 100%; min-height: 430px; margin-top: 14px; border: 1px solid #45536a; border-radius: 8px; background: #080b12; }
+.run-entry { padding: 22px; border: 1px solid #9d4040; border-radius: 12px; background: #231518; }.run-entry__summary { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; margin: 18px 0; }.run-entry__summary > div { padding: 12px; border: 1px solid #4b2a30; border-radius: 7px; background: #1a1114; }.run-entry__summary dt { color: #aeb9c9; font-size: .72rem; text-transform: uppercase; letter-spacing: .06em; }.run-entry__summary dd { margin: 5px 0 0; color: #f4f8ff; font-size: .9rem; }.run-entry__go { padding: 12px 20px; border: 1px solid #d65b5b; border-radius: 7px; background: #a63239; color: #fff; cursor: pointer; font-weight: 800; }.run-entry__go:disabled { cursor: not-allowed; opacity: .45; }.run-preview { padding: 16px; border: 1px solid #7b3c3c; border-radius: 10px; background: #180e11; }
 
 .header h1 {
   font-size: 1.4rem;
@@ -176,4 +177,4 @@ body {
   color: #999;
 }
 button:focus-visible, input:focus-visible, select:focus-visible, a:focus-visible { outline: 3px solid #73e3ff; outline-offset: 2px; }
-@media (max-width: 720px) { .admin-shell__header { flex-direction: column; }.admin-shell__nav { overflow-x: auto; }.admin-shell__nav button { min-width: 110px; }.admin-context .form { grid-template-columns: 1fr; }.player-preview { min-height: 280px; } }
+@media (max-width: 720px) { .admin-shell__header { flex-direction: column; }.admin-shell__nav { overflow-x: auto; }.admin-shell__nav button { min-width: 110px; }.admin-context .form, .run-entry__summary { grid-template-columns: 1fr; }.player-preview { min-height: 280px; } }

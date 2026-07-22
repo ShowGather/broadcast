@@ -1,6 +1,6 @@
 import Fastify from "fastify";
 import cors from "@fastify/cors";
-import { eventRoutes } from "./routes/events.js";
+import { eventRoutes, injectorReachable } from "./routes/events.js";
 import { measurementRoutes } from "./routes/measurements.js";
 import { rehearsalRoutes } from "./routes/rehearsal.js";
 import { rundownRoutes } from "./routes/rundown.js";
@@ -20,6 +20,7 @@ export async function buildApp() {
     status: "ok",
     uptime: process.uptime(),
   }));
+  app.get("/api/status", async () => ({ api: "connected", stream: await injectorReachable() ? "connected" : "offline" }));
 
   return app;
 }

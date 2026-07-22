@@ -5,7 +5,7 @@ interface StoredEvent {
   event: { id: string; t: string; p: Record<string, unknown> };
   injectedAt: string;
 }
-interface RundownCue { id: string; label: string; order: number; status: "pending" | "active" | "complete" | "failed" | "cancelled"; executionId?: string; }
+interface RundownCue { id: string; label: string; order: number; enabled: boolean; status: "pending" | "active" | "complete" | "failed" | "cancelled"; executionId?: string; }
 interface Channel { id: string; name: string; slug: string; status: string; }
 interface Production { id: string; title: string; description?: string | null; status: string; scheduledStart?: string | null; scheduledEnd?: string | null; configuration?: Record<string, unknown> | null; showConfigurationId?: string | null; }
 interface Rundown { id: string; name: string; version: number; }
@@ -34,7 +34,10 @@ export default function App() {
   const [label, setLabel] = useState("");
   const [commandDuration, setCommandDuration] = useState(8000);
   const [rundown, setRundown] = useState<RundownCue[]>([]);
+  const [sessionId, setSessionId] = useState("");
   const [apiConnection, setApiConnection] = useState<"checking" | "connected" | "offline">("checking");
+  const [streamConnection, setStreamConnection] = useState<"checking" | "connected" | "offline">("checking");
+  const [runReady, setRunReady] = useState(false);
   const [channels, setChannels] = useState<Channel[]>([]);
   const [productions, setProductions] = useState<Production[]>([]);
   const [rundowns, setRundowns] = useState<Rundown[]>([]);
@@ -139,7 +142,10 @@ export default function App() {
   const fetchRundown = useCallback(async () => {
     if (!rundownId) return;
     const response = await fetch(`/api/rundown/${rehearsal ? "rehearsal" : "live"}?rundownId=${encodeURIComponent(rundownId)}`);
-    if (response.ok) setRundown((await response.json()).cues);
+    if (response.ok) {
+      const result = await response.json() as { cues: RundownCue[]; sessionId?: string };
+      setRundown(result.cues); setSessionId(result.sessionId ?? "");
+    }
   }, [rehearsal, rundownId]);
   useEffect(() => { fetchRundown().catch(() => {}); }, [fetchRundown]);
 
@@ -153,12 +159,16 @@ export default function App() {
   useEffect(() => {
     let active = true;
     const check = async () => {
-      try { const response = await fetch("/api/health"); if (active) setApiConnection(response.ok ? "connected" : "offline"); }
-      catch { if (active) setApiConnection("offline"); }
+      try {
+        const response = await fetch("/api/status");
+        const result = response.ok ? await response.json() as { stream?: "connected" | "offline" } : null;
+        if (active) { setApiConnection(response.ok ? "connected" : "offline"); setStreamConnection(result?.stream === "connected" ? "connected" : "offline"); }
+      } catch { if (active) { setApiConnection("offline"); setStreamConnection("offline"); } }
     };
     check(); const interval = window.setInterval(check, 5_000);
     return () => { active = false; window.clearInterval(interval); };
   }, []);
+  useEffect(() => { if (workspace !== "run") setRunReady(false); }, [workspace]);
 
   const send = async (body: Record<string, unknown>, success: string) => {
     setStatus(""); setError("");
@@ -234,9 +244,17 @@ export default function App() {
 
   const selectedProduction = productions.find((production) => production.id === productionId);
   const playerPreviewUrl = channelId ? `${window.location.protocol}//${window.location.hostname}:3003/player/${encodeURIComponent(channelId)}?profile=desktop&rehearsal=1&embedded=1&productionId=${encodeURIComponent(productionId)}` : "";
+  const programmePreviewUrl = channelId ? `${window.location.protocol}//${window.location.hostname}:3003/player/${encodeURIComponent(channelId)}?profile=desktop&embedded=1&productionId=${encodeURIComponent(productionId)}` : "";
+  const disabledCueCount = rundown.filter((cue) => !cue.enabled).length;
+  const unresolvedOutbox = outbox.filter((item) => item.status === "failed" || item.status === "pending");
+  const enterRun = async () => {
+    if (sessionId) { setRunReady(true); setStatus("Resumed the existing live session."); return; }
+    const result = await mutate(`/api/rundown/live/sessions?rundownId=${encodeURIComponent(rundownId)}`, "POST", {}, "Live session started", fetchRundown);
+    if (result) setRunReady(true);
+  };
 
   return <div className={`container workspace workspace--${workspace}`}>
-    <header className="admin-shell__header"><div><a className="admin-shell__brand" href="/admin/productions" onClick={(event) => { event.preventDefault(); navigate({ workspace: "productions" }); }}>ShowGather</a><p>{workspace === "run" ? "Focused live operation" : workspace === "rehearse" ? "Safe rehearsal — no live presentation changes" : "Prepare saved productions and rundowns"}</p></div><p className={`connection connection--${apiConnection}`}>API {apiConnection}</p></header>
+    <header className="admin-shell__header"><div><a className="admin-shell__brand" href="/admin/productions" onClick={(event) => { event.preventDefault(); navigate({ workspace: "productions" }); }}>ShowGather</a><p>{workspace === "run" ? "Focused live operation" : workspace === "rehearse" ? "Safe rehearsal — no live presentation changes" : "Prepare saved productions and rundowns"}</p></div><div><p className={`connection connection--${apiConnection}`}>API {apiConnection}</p><p className={`connection connection--${streamConnection}`}>Stream {streamConnection}</p></div></header>
     <nav className="admin-shell__nav" aria-label="Production workspace">
       <button className={route.workspace === "productions" ? "active" : ""} onClick={() => navigate({ workspace: "productions" })}>Productions</button>
       {(["prepare", "rehearse", "run"] as const).map((item) => <button key={item} disabled={!productionId} className={workspace === item ? "active" : ""} onClick={() => navigate({ workspace: item, productionId })}>{item}</button>)}
@@ -289,7 +307,17 @@ export default function App() {
       {playerPreviewUrl ? <iframe title="Rehearsal Player preview" src={playerPreviewUrl} className="player-preview" /> : <p className="empty">Choose a channel to load the preview.</p>}
     </section>}
 
-    {workspace !== "prepare" && <section className="section quick-cues">
+    {workspace === "run" && !runReady && <section className="section run-entry" aria-labelledby="run-entry-title">
+      <h2 id="run-entry-title">Confirm live operation</h2>
+      <p className="hint">Entering this workspace does not put the programme live. Review the current operational state, then explicitly start or resume the live session.</p>
+      <dl className="run-entry__summary"><div><dt>Production</dt><dd>{selectedProduction?.title ?? "Not selected"}</dd></div><div><dt>Rundown</dt><dd>{rundowns.find((item) => item.id === rundownId)?.name ?? "Not selected"}</dd></div><div><dt>Cues</dt><dd>{rundown.length} total · {disabledCueCount} disabled</dd></div><div><dt>Connection</dt><dd>API {apiConnection} · Stream {streamConnection}</dd></div><div><dt>Live session</dt><dd>{sessionId ? "Existing session can be resumed" : "No active session"}</dd></div><div><dt>Dispatch issues</dt><dd>{unresolvedOutbox.length ? `${unresolvedOutbox.length} pending or failed` : "None"}</dd></div></dl>
+      {unresolvedOutbox.length > 0 && <p className="error-msg" role="alert">Resolve or acknowledge the listed dispatch issues before operating live. Retry and Cancel remain available below.</p>}
+      <button className="run-entry__go" disabled={!rundownId || apiConnection !== "connected" || streamConnection !== "connected"} onClick={enterRun}>{sessionId ? "Resume live session" : "Start live session"}</button>
+    </section>}
+
+    {workspace === "run" && runReady && <section className="section run-preview"><h2>Programme preview</h2>{programmePreviewUrl && <iframe title="Programme Player preview" src={programmePreviewUrl} className="player-preview" />}</section>}
+
+    {workspace !== "prepare" && (workspace !== "run" || runReady) && <section className="section quick-cues">
       <h2>On-air cues</h2>
       <div className="cue-grid">
         <button onClick={() => send({ cue: "goal-home", durationMs: 15_000 }, "Home Goal sent")}>⚽ Home Goal</button>
@@ -300,7 +328,7 @@ export default function App() {
       <p className="hint">Safe Clear removes presentation only. The programme video continues uninterrupted.</p>
     </section>}
 
-    {workspace !== "prepare" && <section className="section">
+    {workspace !== "prepare" && (workspace !== "run" || runReady) && <section className="section">
       <h2>Rundown — {rehearsal ? "Rehearsal" : "Live"}</h2>
       <p className="hint">GO uses an idempotent execution ID. Completed cues require explicit re-run; rehearsal state is separate from live.</p>
       <button disabled={!rundownId} onClick={() => mutate(`/api/rundown/${rehearsal ? "rehearsal" : "live"}/sessions?rundownId=${encodeURIComponent(rundownId)}`, "POST", {}, `${rehearsal ? "Rehearsal" : "Live"} session started`, fetchRundown)}>Start new {rehearsal ? "rehearsal" : "live"} session</button>

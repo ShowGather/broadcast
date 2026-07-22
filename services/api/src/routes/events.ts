@@ -17,6 +17,14 @@ const INJECTOR_HOST = process.env.ID3_INJECTOR_HOST ?? "localhost";
 const INJECTOR_PORT = process.env.ID3_INJECTOR_PORT ?? "8080";
 const INJECTOR_URL = `http://${INJECTOR_HOST}:${INJECTOR_PORT}/inject`;
 
+/** Reachability only: the injector has no separate health endpoint in the POC. */
+export async function injectorReachable(): Promise<boolean> {
+  try {
+    await fetch(`http://${INJECTOR_HOST}:${INJECTOR_PORT}/`, { signal: AbortSignal.timeout(1_500) });
+    return true;
+  } catch { return false; }
+}
+
 export interface EventRequest {
   title?: string;
   message?: string;
