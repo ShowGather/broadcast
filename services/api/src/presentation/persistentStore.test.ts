@@ -1,12 +1,13 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { randomUUID } from "node:crypto";
+import { existsSync } from "node:fs";
 import { PrismaClient, type Prisma } from "@prisma/client";
 import type { ShowGatherEvent } from "@showgather/event-schema";
 import { createPersistentPresentationSnapshot, createV1PresentationBaseline } from "@showgather/presentation-model";
 import { PersistentPresentationStore } from "./persistentStore.js";
 
-if (!process.env.DATABASE_URL) process.loadEnvFile("../../.env");
+if (!process.env.DATABASE_URL && existsSync("../../.env")) process.loadEnvFile("../../.env");
 const databaseUrl = process.env.DATABASE_URL;
 const prisma = databaseUrl ? new PrismaClient() : null;
 
