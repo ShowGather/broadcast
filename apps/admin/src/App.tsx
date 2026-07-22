@@ -363,14 +363,15 @@ export default function App() {
         {(["scorebug", "lower-third", "ticker", "alert", "sponsor-panel", "clock"] as const).map((kind) => <button key={kind} type="button" role="listitem" className={selectedElement === kind ? "active" : ""} onClick={() => chooseElement(kind)}>{kind === "sponsor-panel" ? "Sponsor bug" : kind.replace("-", " ")}</button>)}
       </div>
     </section><section className="section">
-      <div hidden={prepareTab !== "overview"}>
+      <div hidden={prepareTab !== "overview"} className="prepare-overview">
+      <div>
       <h2>Production editor</h2>
       <div className="form">
         <label><span>Title</span><input value={productionTitle} onChange={(event) => setProductionTitle(event.target.value)} /></label>
         <label><span>Description</span><input value={productionDescription} onChange={(event) => setProductionDescription(event.target.value)} /></label>
         <label><span>Status</span><select value={productionStatus} onChange={(event) => setProductionStatus(event.target.value)}><option value="draft">Draft</option><option value="rehearsal">Rehearsal</option><option value="live">Live</option><option value="complete">Complete</option><option value="archived">Archived</option></select></label>
         <button onClick={() => createProduction()}>Create production</button><button disabled={!productionId} onClick={() => mutate(`/api/productions/${productionId}`, "PUT", { title: productionTitle, description: productionDescription, status: productionStatus }, "Production saved", refreshShowContext)}>Save production</button><button disabled={!productionId} onClick={duplicateProduction}>Duplicate production</button>
-      </div></div>
+      </div></div><aside className="readiness-panel" aria-label="Show readiness"><h2>Show readiness</h2><ul><li className={productionTitle.trim() ? "ready" : "attention"}>{productionTitle.trim() ? "Production details ready" : "Add production details"}</li><li className={selectedProduction?.configuration ? "ready" : "attention"}>{selectedProduction?.configuration ? "Show configuration selected" : "Select or create show configuration"}</li><li className={rundownId ? "ready" : "attention"}>{rundownId ? `Rundown created${rundownDefinition.length ? ` · ${rundownDefinition.length} cues` : " · add cues"}` : "Create a rundown"}</li><li className={disabledCueCount === 0 ? "ready" : "attention"}>{disabledCueCount === 0 ? "No disabled cues" : `${disabledCueCount} disabled cue${disabledCueCount === 1 ? "" : "s"}`}</li><li className="attention">No rehearsal completed yet</li></ul><button type="button" disabled={!productionId || !rundownId} onClick={() => navigate({ workspace: "rehearse", productionId })}>Open rehearsal</button></aside></div>
       <div hidden={prepareTab !== "configuration"}><h2>Show configuration</h2>
       <div className="form">
         <label><span>Package name</span><input value={configurationName} onChange={(event) => setConfigurationName(event.target.value)} /></label>
