@@ -4,7 +4,10 @@ import {
   applyPresentationCommand,
   createPresentationState,
   expirePresentationItems,
+  normalisePlacement,
+  placementFromPreset,
   resolvePresentationRegion,
+  resolvePresentationTarget,
 } from "./index";
 
 const defaultSponsor = {
@@ -79,4 +82,30 @@ test("a regional clear leaves other regions untouched", () => {
 
   assert.equal(resolvePresentationRegion(state, "right.rail").length, 0);
   assert.equal(resolvePresentationRegion(state, "footer").length, 1);
+});
+
+test("stable instance IDs allow multiple lower thirds in one layer", () => {
+  let state = applyPresentationCommand(createPresentationState(), {
+    action: "activate", eventId: "presenter-a", targetPts: 10, region: "video.overlay", layer: "lower-third", instanceId: "lower-third-presenter-a",
+    item: { kind: "lower-third", title: "Presenter A" },
+  });
+  state = applyPresentationCommand(state, {
+    action: "activate", eventId: "presenter-b", targetPts: 11, region: "video.overlay", layer: "lower-third", instanceId: "lower-third-presenter-b",
+    item: { kind: "lower-third", title: "Presenter B" },
+  });
+
+  assert.deepEqual(resolvePresentationRegion(state, "video.overlay").map((entry) => entry.instanceId), ["lower-third-presenter-a", "lower-third-presenter-b"]);
+});
+
+test("profile placement moves legacy surround items to intentional TV and mobile targets", () => {
+  const state = applyPresentationCommand(createPresentationState(), defaultSponsor);
+  assert.equal(resolvePresentationTarget(state, "right.rail", "desktop").length, 1);
+  assert.equal(resolvePresentationTarget(state, "video.overlay", "tv")[0]?.placement.anchor, "top-right");
+  assert.equal(resolvePresentationTarget(state, "video.overlay", "mobile").length, 0);
+});
+
+test("placement presets produce normalised title-safe transforms", () => {
+  const placement = placementFromPreset("video", "bottom-left", { x: -2, y: 2, width: 2 });
+  assert.deepEqual(placement, { surface: "video", anchor: "bottom-left", x: 0.04, y: 0.96, width: 0.92, safeArea: true, layout: "column" });
+  assert.equal(normalisePlacement({ surface: "video", anchor: "top-left", x: Number.NaN, y: 0, width: 0 }).width, 0.08);
 });

@@ -60,9 +60,15 @@ export interface PresentationActivation {
    * scorebug and lower third coexist in separate video-overlay layers.
    */
   layer: string;
+  /** Stable logical identity. Omitted legacy commands retain their layer ID. */
+  instanceId?: string;
   item: PresentationItem;
   priority?: number;
+  zIndex?: number;
   durationMs?: number;
+  placementByProfile?: import("./layout.js").PlacementByProfile;
+  variantByProfile?: import("./layout.js").VariantByProfile;
+  transition?: import("./layout.js").PresentationTransition;
 }
 
 export interface PresentationClear {
@@ -71,6 +77,7 @@ export interface PresentationClear {
   targetPts: number;
   region?: PresentationRegionName;
   layer?: string;
+  instanceId?: string;
 }
 
 export type PresentationCommand = PresentationActivation | PresentationClear;
@@ -79,10 +86,15 @@ export interface PresentationEntry {
   eventId: string;
   region: PresentationRegionName;
   layer: string;
+  instanceId: string;
   item: PresentationItem;
   priority: number;
+  zIndex: number;
   activatedAtPts: number;
   expiresAtPts?: number;
+  placementByProfile?: import("./layout.js").PlacementByProfile;
+  variantByProfile?: import("./layout.js").VariantByProfile;
+  transition?: import("./layout.js").PresentationTransition;
 }
 
 export type PresentationState = Record<PresentationRegionName, PresentationEntry[]>;
@@ -145,9 +157,14 @@ export function applyPresentationCommand(
     eventId: command.eventId,
     region: command.region,
     layer: command.layer,
+    instanceId: command.instanceId ?? command.layer,
     item: command.item,
     priority: command.priority ?? 0,
+    zIndex: command.zIndex ?? command.priority ?? 0,
     activatedAtPts: command.targetPts,
+    ...(command.placementByProfile === undefined ? {} : { placementByProfile: command.placementByProfile }),
+    ...(command.variantByProfile === undefined ? {} : { variantByProfile: command.variantByProfile }),
+    ...(command.transition === undefined ? {} : { transition: command.transition }),
     ...(command.durationMs === undefined
       ? {}
       : { expiresAtPts: command.targetPts + command.durationMs / 1000 }),
@@ -188,18 +205,19 @@ export function resolvePresentationRegion(
   const topByLayer = new Map<string, PresentationEntry>();
 
   for (const entry of state[region]) {
-    const current = topByLayer.get(entry.layer);
+    const resolutionKey = `${entry.layer}:${entry.instanceId}`;
+    const current = topByLayer.get(resolutionKey);
     if (
       current === undefined ||
       entry.priority > current.priority ||
       (entry.priority === current.priority && entry.activatedAtPts >= current.activatedAtPts)
     ) {
-      topByLayer.set(entry.layer, entry);
+      topByLayer.set(resolutionKey, entry);
     }
   }
 
   return [...topByLayer.values()].sort(
-    (a, b) => a.layer.localeCompare(b.layer) || a.eventId.localeCompare(b.eventId)
+    (a, b) => a.zIndex - b.zIndex || a.layer.localeCompare(b.layer) || a.instanceId.localeCompare(b.instanceId)
   );
 }
 
@@ -215,7 +233,7 @@ function clearPresentation(state: PresentationState, command: PresentationClear)
   return {
     ...state,
     [command.region]: state[command.region].filter(
-      (entry) => command.layer !== undefined && entry.layer !== command.layer
+      (entry) => (command.layer !== undefined && entry.layer !== command.layer) || (command.instanceId !== undefined && entry.instanceId !== command.instanceId)
     ),
   };
 }
@@ -235,3 +253,4 @@ function mapRegions(
 
 export { resolvePresentationCue, type PresentationCueInput, type PresentationCueKey } from "./cues.js";
 export { resolvePresentationCommand, type PresentationCommandInput, type PresentationCommandPayload } from "./commands.js";
+export { placementFromPreset, normalisePlacement, resolvePresentationInstance, resolvePresentationTarget, PRESENTATION_PRESETS, type PlacementByProfile, type PresentationAnchor, type PresentationSurface, type PresentationTransition, type PresentationTransitionKind, type ProfilePlacement, type ResolvedPresentationInstance, type ViewerProfile, type VariantByProfile } from "./layout.js";

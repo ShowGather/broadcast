@@ -80,7 +80,7 @@ function ViewerExperience() {
 
   const video = <div className="video-container">
     <video ref={videoRef} controls autoPlay muted className="video-player" />
-    <PresentationRegion name="video.overlay">
+    <PresentationRegion name="video.overlay" profile={profile}>
       {overlays.map((overlay) => overlay.event.t === "overlay.show" && <div key={overlay.event.id} className="overlay">
         <div className="overlay-title">{overlay.event.p.title}</div>
         {overlay.event.p.msg && <div className="overlay-msg">{overlay.event.p.msg}</div>}
