@@ -1,0 +1,170 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Organisation {
+  id        String    @id @default(cuid())
+  name      String
+  slug      String    @unique
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  channels  Channel[]
+}
+
+model Channel {
+  id                String                @id @default(cuid())
+  organisationId    String
+  name              String
+  slug              String                @unique
+  status            String                @default("active")
+  settings          Json?
+  nextRevision      Int                   @default(0)
+  publishedRevision Int                   @default(0)
+  createdAt         DateTime              @default(now())
+  updatedAt         DateTime              @updatedAt
+  organisation      Organisation          @relation(fields: [organisationId], references: [id], onDelete: Cascade)
+  productions       Production[]
+  snapshot          PresentationSnapshot?
+  commands          PresentationCommand[]
+  outboxEvents      PresentationOutbox[]
+
+  @@unique([organisationId, slug])
+}
+
+model Production {
+  id             String                    @id @default(cuid())
+  channelId      String
+  title          String
+  description    String?
+  status         String                    @default("draft")
+  scheduledStart DateTime?
+  scheduledEnd   DateTime?
+  createdAt      DateTime                  @default(now())
+  updatedAt      DateTime                  @updatedAt
+  channel        Channel                   @relation(fields: [channelId], references: [id], onDelete: Cascade)
+  rundowns       Rundown[]
+  commands       PresentationCommand[]
+  snapshot       PresentationSnapshot?
+  sessions       RundownExecutionSession[]
+}
+
+model Rundown {
+  id           String                    @id @default(cuid())
+  productionId String
+  name         String
+  version      Int                       @default(1)
+  createdAt    DateTime                  @default(now())
+  updatedAt    DateTime                  @updatedAt
+  production   Production                @relation(fields: [productionId], references: [id], onDelete: Cascade)
+  cues         RundownCue[]
+  sessions     RundownExecutionSession[]
+}
+
+model RundownCue {
+  id             String                  @id @default(cuid())
+  rundownId      String
+  position       Int
+  label          String
+  commandType    String
+  commandPayload Json
+  enabled        Boolean                 @default(true)
+  createdAt      DateTime                @default(now())
+  updatedAt      DateTime                @updatedAt
+  rundown        Rundown                 @relation(fields: [rundownId], references: [id], onDelete: Cascade)
+  executions     RundownCueExecution[]
+
+  @@unique([rundownId, position])
+}
+
+model PresentationSnapshot {
+  id           String   @id @default(cuid())
+  channelId    String   @unique
+  productionId String?  @unique
+  revision     Int      @default(0)
+  state        Json
+  updatedAt    DateTime @updatedAt
+  channel      Channel  @relation(fields: [channelId], references: [id], onDelete: Cascade)
+  production   Production? @relation(fields: [productionId], references: [id], onDelete: SetNull)
+}
+
+model PresentationCommand {
+  id           String   @id @default(cuid())
+  eventId      String   @unique
+  executionId  String?  @unique
+  channelId    String
+  productionId String?
+  revision     Int?
+  commandType  String
+  commandPayload Json
+  event        Json
+  targetPts    Float?
+  transport    String
+  source       String
+  status       String   @default("accepted")
+  dispatchError String?
+  acceptedAt   DateTime @default(now())
+  dispatchedAt DateTime?
+  channel      Channel  @relation(fields: [channelId], references: [id], onDelete: Cascade)
+  production   Production? @relation(fields: [productionId], references: [id], onDelete: SetNull)
+  outboxEvent  PresentationOutbox?
+
+  @@index([channelId, revision])
+  @@index([channelId, status])
+}
+
+model PresentationOutbox {
+  id              String   @id @default(cuid())
+  commandId       String   @unique
+  channelId       String
+  revision        Int
+  event           Json
+  status          String   @default("pending")
+  attempts        Int      @default(0)
+  lastError       String?
+  injectorAcceptedAt DateTime?
+  dispatchedAt    DateTime?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  command         PresentationCommand @relation(fields: [commandId], references: [id], onDelete: Cascade)
+  channel         Channel  @relation(fields: [channelId], references: [id], onDelete: Cascade)
+
+  @@unique([channelId, revision])
+  @@index([channelId, status, revision])
+}
+
+model RundownExecutionSession {
+  id           String                  @id @default(cuid())
+  rundownId    String
+  productionId String
+  mode         String
+  status       String                  @default("active")
+  startedAt    DateTime                @default(now())
+  completedAt  DateTime?
+  rundown      Rundown                 @relation(fields: [rundownId], references: [id], onDelete: Cascade)
+  production   Production               @relation(fields: [productionId], references: [id], onDelete: Cascade)
+  cues         RundownCueExecution[]
+
+  @@index([rundownId, mode, status])
+}
+
+model RundownCueExecution {
+  id          String                  @id @default(cuid())
+  sessionId   String
+  rundownCueId String
+  executionId String                  @unique
+  status      String
+  revision    Int?
+  executedAt  DateTime?
+  error       String?
+  createdAt   DateTime                @default(now())
+  updatedAt   DateTime                @updatedAt
+  session     RundownExecutionSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  rundownCue  RundownCue              @relation(fields: [rundownCueId], references: [id], onDelete: Cascade)
+
+  @@index([sessionId, rundownCueId])
+}

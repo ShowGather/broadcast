@@ -13,7 +13,12 @@
     "typecheck": "pnpm -r run typecheck",
     "stream": "bash stream/scripts/generate-test-stream.sh",
     "verify": "bash stream/scripts/verify-segments.sh",
-    "pilot:up": "docker compose -f deploy/compose/docker-compose.yml up --build -d",
-    "pilot:down": "docker compose -f deploy/compose/docker-compose.yml down"
+    "pilot:up": "docker compose --env-file .env -f deploy/compose/docker-compose.yml up --build -d",
+    "pilot:down": "docker compose --env-file .env -f deploy/compose/docker-compose.yml down",
+    "db:generate": "pnpm --filter @showgather/api db:generate",
+    "db:migrate": "pnpm --filter @showgather/api db:migrate",
+    "db:deploy": "pnpm --filter @showgather/api db:deploy",
+    "db:seed": "pnpm --filter @showgather/api db:seed",
+    "db:reset": "pnpm --filter @showgather/api db:reset"
   }
 }
