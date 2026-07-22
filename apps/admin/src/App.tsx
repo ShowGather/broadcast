@@ -88,6 +88,8 @@ export default function App() {
   const [layoutX, setLayoutX] = useState(.04);
   const [layoutY, setLayoutY] = useState(.04);
   const [layoutWidth, setLayoutWidth] = useState(.36);
+  const [layoutSafeArea, setLayoutSafeArea] = useState(true);
+  const [layoutPolicy, setLayoutPolicy] = useState<"single" | "column" | "overlay">("overlay");
   const [selectedElement, setSelectedElement] = useState("scorebug");
   const [configurations, setConfigurations] = useState<ShowConfiguration[]>([]);
   const workspace = route.workspace === "productions" ? "prepare" : route.workspace;
@@ -315,7 +317,7 @@ export default function App() {
   const runCue = rundown[runCueIndex];
   const nextRunCue = rundown.slice(runCueIndex + 1).find((cue) => cue.enabled && cue.status !== "complete");
   const saveLayoutPreset = () => setPresentationLayouts((current) => {
-    const placement = { ...placementPreset(layoutSurface, layoutAnchor), x: layoutX, y: layoutY, width: layoutWidth };
+    const placement = { ...placementPreset(layoutSurface, layoutAnchor), x: layoutX, y: layoutY, width: layoutWidth, safeArea: layoutSafeArea, layout: layoutPolicy };
     const existing = current.find((definition) => definition.instanceId === layoutInstanceId);
     if (existing) return current.map((definition) => definition.instanceId === layoutInstanceId ? { ...definition, placementByProfile: { ...definition.placementByProfile, [layoutProfile]: placement } } : definition);
     return [...current, { instanceId: layoutInstanceId, placementByProfile: { [layoutProfile]: placement } }];
@@ -331,7 +333,7 @@ export default function App() {
     };
     const selected = defaults[kind];
     const placement = placementPreset(selected.surface, selected.anchor);
-    setSelectedElement(kind); if (selected.command) setCommandKind(selected.command); setCommandInstanceId(selected.instanceId); setLayoutInstanceId(selected.instanceId); setLayoutSurface(selected.surface); setLayoutAnchor(selected.anchor); setLayoutX(placement.x); setLayoutY(placement.y); setLayoutWidth(placement.width);
+    setSelectedElement(kind); if (selected.command) setCommandKind(selected.command); setCommandInstanceId(selected.instanceId); setLayoutInstanceId(selected.instanceId); setLayoutSurface(selected.surface); setLayoutAnchor(selected.anchor); setLayoutX(placement.x); setLayoutY(placement.y); setLayoutWidth(placement.width); setLayoutSafeArea(placement.safeArea ?? false); setLayoutPolicy(placement.layout === "column" ? "column" : "overlay");
     setStatus(selected.command ? `${kind} selected. Choose a profile and apply a placement preset, then configure its typed command.` : `${kind} selected. Configure its profile placement; programme clock content is currently supplied by a scene or future clock command.`);
   };
 
@@ -404,6 +406,7 @@ export default function App() {
           <label><span>Surface</span><select value={layoutSurface} onChange={(event) => setLayoutSurface(event.target.value as LayoutSurface)}>{(["video", "surround", "companion"] as const).map((surface) => <option key={surface}>{surface}</option>)}</select></label>
           <label><span>Preset</span><select value={layoutAnchor} onChange={(event) => setLayoutAnchor(event.target.value as LayoutAnchor)}>{(["top-left", "top-centre", "top-right", "centre-left", "centre", "centre-right", "bottom-left", "bottom-centre", "bottom-right"] as const).map((anchor) => <option key={anchor}>{anchor}</option>)}</select></label>
           <label><span>Horizontal offset</span><input type="number" min={0} max={1} step={.01} value={layoutX} onChange={(event) => setLayoutX(Number(event.target.value))} /></label><label><span>Vertical offset</span><input type="number" min={0} max={1} step={.01} value={layoutY} onChange={(event) => setLayoutY(Number(event.target.value))} /></label><label><span>Width</span><input type="number" min={.08} max={1} step={.01} value={layoutWidth} onChange={(event) => setLayoutWidth(Number(event.target.value))} /></label>
+          <label><span>Collision policy</span><select value={layoutPolicy} onChange={(event) => setLayoutPolicy(event.target.value as "single" | "column" | "overlay")}><option value="overlay">Overlay</option><option value="column">Stack in column</option><option value="single">Single slot</option></select></label><label><span>Title/action safe area</span><input type="checkbox" checked={layoutSafeArea} onChange={(event) => setLayoutSafeArea(event.target.checked)} /></label>
           <button type="button" onClick={saveLayoutPreset}>Apply preset</button>
           {presentationLayouts.length > 0 && <ul className="placement-summary">{presentationLayouts.map((definition) => <li key={definition.instanceId}><b>{definition.instanceId}</b> · {Object.entries(definition.placementByProfile).map(([profile, placement]) => `${profile}: ${placement?.surface} ${placement?.anchor}`).join(" · ")}</li>)}</ul>}
         </fieldset>
