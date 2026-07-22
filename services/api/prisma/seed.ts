@@ -13,34 +13,21 @@ const cues = [
 ] as const;
 
 async function main() {
-  const organisation = await prisma.organisation.upsert({
-    where: { slug: "showgather-demo" },
-    update: { name: "ShowGather Demo" },
-    create: { name: "ShowGather Demo", slug: "showgather-demo" },
-  });
-  const channel = await prisma.channel.upsert({
-    where: { slug: "demo-channel" },
-    update: { name: "Demo Channel", organisationId: organisation.id },
-    create: { name: "Demo Channel", slug: "demo-channel", organisationId: organisation.id },
-  });
-  const production = await prisma.production.upsert({
-    where: { id: "showgather-v1-pilot" },
-    update: { title: "ShowGather V1 Pilot", channelId: channel.id },
-    create: { id: "showgather-v1-pilot", channelId: channel.id, title: "ShowGather V1 Pilot", status: "rehearsal" },
-  });
-  const rundown = await prisma.rundown.upsert({
-    where: { id: "showgather-v1-demonstration" },
-    update: { name: "V1 Demonstration", productionId: production.id },
-    create: { id: "showgather-v1-demonstration", productionId: production.id, name: "V1 Demonstration" },
-  });
+  let organisation = await prisma.organisation.findUnique({ where: { slug: "showgather-demo" } });
+  if (!organisation) organisation = await prisma.organisation.create({ data: { name: "ShowGather Demo", slug: "showgather-demo" } });
+  let channel = await prisma.channel.findUnique({ where: { slug: "demo-channel" } });
+  if (!channel) channel = await prisma.channel.create({ data: { name: "Demo Channel", slug: "demo-channel", organisationId: organisation.id } });
 
-  for (const cue of cues) {
-    await prisma.rundownCue.upsert({
-      where: { rundownId_position: { rundownId: rundown.id, position: cue.position } },
-      update: { label: cue.label, commandType: cue.command.k, commandPayload: cue.command },
-      create: { rundownId: rundown.id, position: cue.position, label: cue.label, commandType: cue.command.k, commandPayload: cue.command },
-    });
-  }
+  let configuration = await prisma.showConfiguration.findFirst({ where: { channelId: channel.id, name: "Football Demo" } });
+  if (!configuration) configuration = await prisma.showConfiguration.create({ data: { channelId: channel.id, name: "Football Demo", configuration: { sport: "football", homeTeam: "HOME", awayTeam: "AWAY", tickerLabel: "LIVE" } } });
+
+  let production = await prisma.production.findUnique({ where: { id: "showgather-v1-pilot" } });
+  if (!production) production = await prisma.production.create({ data: { id: "showgather-v1-pilot", channelId: channel.id, title: "ShowGather V1 Pilot", status: "rehearsal", showConfigurationId: configuration.id, configuration: configuration.configuration } });
+  let rundown = await prisma.rundown.findUnique({ where: { id: "showgather-v1-demonstration" } });
+  if (!rundown) rundown = await prisma.rundown.create({ data: { id: "showgather-v1-demonstration", productionId: production.id, name: "V1 Demonstration" } });
+
+  const existingCues = await prisma.rundownCue.count({ where: { rundownId: rundown.id } });
+  if (existingCues === 0) await prisma.rundownCue.createMany({ data: cues.map((cue) => ({ rundownId: rundown.id, position: cue.position, label: cue.label, commandType: cue.command.k, commandPayload: cue.command })) });
 
   const snapshot = createPersistentPresentationSnapshot(createV1PresentationBaseline(), 0);
   await prisma.presentationSnapshot.upsert({

@@ -28,6 +28,13 @@ export async function rundownRoutes(app: FastifyInstance) {
     if (persistentRundown) return persistentRundown.snapshot(request.params.target, request.query.rundownId);
     return snapshot(request.params.target);
   });
+  app.post<{ Params: { target: Target }; Querystring: { rundownId?: string } }>("/rundown/:target/sessions", async (request, reply) => {
+    const target = request.params.target;
+    if (target !== "live" && target !== "rehearsal") return reply.status(400).send({ error: "target must be live or rehearsal" });
+    if (!persistentRundown) return reply.status(503).send({ error: "database persistence is not configured" });
+    try { return reply.status(201).send(await persistentRundown.startSession(target, request.query.rundownId)); }
+    catch (error) { return reply.status(404).send({ error: error instanceof Error ? error.message : "unable to start execution session" }); }
+  });
   app.post<{ Params: { target: Target }; Querystring: { rundownId?: string }; Body: { cueId?: string; rerun?: boolean } }>("/rundown/:target/go", async (request, reply) => {
     const target = request.params.target;
     if (target !== "live" && target !== "rehearsal") return reply.status(400).send({ error: "target must be live or rehearsal" });

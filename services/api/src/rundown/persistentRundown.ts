@@ -1,4 +1,4 @@
-import type { PrismaClient } from "@prisma/client";
+import { type Prisma, type PrismaClient } from "@prisma/client";
 import type { PresentationCommandPayload, ShowGatherEvent } from "@showgather/event-schema";
 import { createEvent, dispatchLiveEvent, retryLiveEvent } from "../routes/events.js";
 import { dispatchRehearsalEvent } from "../routes/rehearsal.js";
@@ -8,6 +8,7 @@ type CueStatus = "pending" | "active" | "complete" | "failed" | "cancelled";
 const DEFAULT_RUNDOWN_ID = process.env.SHOWGATHER_RUNDOWN_ID ?? "showgather-v1-demonstration";
 
 interface PersistedCue { id: string; label: string; position: number; commandPayload: unknown; enabled: boolean; }
+interface RundownSnapshot { cues: PersistedCue[]; }
 interface CueView { id: string; label: string; order: number; command: PresentationCommandPayload; enabled: boolean; status: CueStatus; executionId?: string; error?: string; }
 
 export class PersistentRundown {
@@ -17,19 +18,21 @@ export class PersistentRundown {
     const rundown = await this.db.rundown.findUniqueOrThrow({ where: { id: rundownId }, include: { cues: { orderBy: { position: "asc" } }, production: true } });
     const session = await this.db.rundownExecutionSession.findFirst({ where: { rundownId: rundown.id, mode: target, status: "active" }, orderBy: { startedAt: "desc" }, include: { cues: true } });
     const executions = new Map(session?.cues.map((execution) => [execution.rundownCueId, execution]) ?? []);
+    const cues = this.sessionSnapshot(session?.rundownSnapshot)?.cues ?? rundown.cues;
     return {
       target,
       rundownId: rundown.id,
       productionId: rundown.productionId,
-      cues: rundown.cues.map((cue) => this.view(cue, executions.get(cue.id))),
+      sessionId: session?.id,
+      cues: cues.map((cue) => this.view(cue, executions.get(cue.id))),
     };
   }
 
   async go(target: RundownTarget, cueId: string, rerun = false, rundownId = DEFAULT_RUNDOWN_ID) {
     const rundown = await this.db.rundown.findUniqueOrThrow({ where: { id: rundownId }, include: { cues: true } });
-    const cue = rundown.cues.find((candidate) => candidate.id === cueId);
+    const session = await this.session(rundown.id, rundown.productionId, target, rundown.cues);
+    const cue = this.sessionSnapshot(session.rundownSnapshot)?.cues.find((candidate) => candidate.id === cueId) ?? rundown.cues.find((candidate) => candidate.id === cueId);
     if (!cue || !cue.enabled) throw new Error("cue not found or disabled");
-    const session = await this.session(rundown.id, rundown.productionId, target);
     const previous = await this.db.rundownCueExecution.findFirst({ where: { sessionId: session.id, rundownCueId: cue.id }, orderBy: { createdAt: "desc" } });
     if (previous?.status === "dispatched" && !rerun) return { ...(await this.snapshot(target, rundownId)), eventId: previous.executionId, duplicate: true };
     if (previous?.status === "accepted" && !rerun) return { ...(await this.snapshot(target, rundownId)), eventId: previous.executionId, duplicate: true };
@@ -65,9 +68,24 @@ export class PersistentRundown {
     return { ...(await this.snapshot(target, rundownId)), event: result.event, dispatchStatus: result.status };
   }
 
-  private async session(rundownId: string, productionId: string, mode: RundownTarget) {
+  async startSession(target: RundownTarget, rundownId = DEFAULT_RUNDOWN_ID) {
+    const rundown = await this.db.rundown.findUniqueOrThrow({ where: { id: rundownId }, include: { cues: { orderBy: { position: "asc" } } } });
+    await this.db.rundownExecutionSession.updateMany({ where: { rundownId, mode: target, status: "active" }, data: { status: "complete", completedAt: new Date() } });
+    const session = await this.db.rundownExecutionSession.create({ data: { rundownId, productionId: rundown.productionId, mode: target, status: "active", rundownSnapshot: this.createSnapshot(rundown.cues) as unknown as Prisma.InputJsonValue } });
+    return { ...(await this.snapshot(target, rundownId)), sessionId: session.id };
+  }
+
+  private async session(rundownId: string, productionId: string, mode: RundownTarget, cues: PersistedCue[]) {
     const current = await this.db.rundownExecutionSession.findFirst({ where: { rundownId, mode, status: "active" }, orderBy: { startedAt: "desc" } });
-    return current ?? this.db.rundownExecutionSession.create({ data: { rundownId, productionId, mode, status: "active" } });
+    return current ?? this.db.rundownExecutionSession.create({ data: { rundownId, productionId, mode, status: "active", rundownSnapshot: this.createSnapshot(cues) as unknown as Prisma.InputJsonValue } });
+  }
+
+  private createSnapshot(cues: PersistedCue[]): RundownSnapshot { return { cues: cues.map((cue) => ({ id: cue.id, label: cue.label, position: cue.position, enabled: cue.enabled, commandPayload: cue.commandPayload })) }; }
+  private sessionSnapshot(value: unknown): RundownSnapshot | null {
+    if (!value || typeof value !== "object" || !Array.isArray((value as { cues?: unknown }).cues)) return null;
+    const cues = (value as { cues: unknown[] }).cues;
+    if (!cues.every((cue) => typeof cue === "object" && cue !== null && typeof (cue as PersistedCue).id === "string" && typeof (cue as PersistedCue).label === "string" && typeof (cue as PersistedCue).position === "number" && typeof (cue as PersistedCue).enabled === "boolean")) return null;
+    return { cues: cues as PersistedCue[] };
   }
 
   private view(cue: PersistedCue, execution?: { status: string; executionId: string; error: string | null }): CueView {

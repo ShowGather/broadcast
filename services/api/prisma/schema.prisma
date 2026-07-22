@@ -29,6 +29,7 @@ model Channel {
   updatedAt         DateTime              @updatedAt
   organisation      Organisation          @relation(fields: [organisationId], references: [id], onDelete: Cascade)
   productions       Production[]
+  showConfigurations ShowConfiguration[]
   snapshot          PresentationSnapshot?
   commands          PresentationCommand[]
   outboxEvents      PresentationOutbox[]
@@ -44,13 +45,29 @@ model Production {
   status         String                    @default("draft")
   scheduledStart DateTime?
   scheduledEnd   DateTime?
+  configuration  Json?
+  showConfigurationId String?
   createdAt      DateTime                  @default(now())
   updatedAt      DateTime                  @updatedAt
   channel        Channel                   @relation(fields: [channelId], references: [id], onDelete: Cascade)
+  showConfiguration ShowConfiguration?     @relation(fields: [showConfigurationId], references: [id], onDelete: SetNull)
   rundowns       Rundown[]
   commands       PresentationCommand[]
   snapshot       PresentationSnapshot?
   sessions       RundownExecutionSession[]
+}
+
+model ShowConfiguration {
+  id           String       @id @default(cuid())
+  channelId    String
+  name         String
+  configuration Json
+  createdAt    DateTime     @default(now())
+  updatedAt    DateTime     @updatedAt
+  channel      Channel      @relation(fields: [channelId], references: [id], onDelete: Cascade)
+  productions  Production[]
+
+  @@unique([channelId, name])
 }
 
 model Rundown {
@@ -145,6 +162,7 @@ model RundownExecutionSession {
   status       String                  @default("active")
   startedAt    DateTime                @default(now())
   completedAt  DateTime?
+  rundownSnapshot Json?
   rundown      Rundown                 @relation(fields: [rundownId], references: [id], onDelete: Cascade)
   production   Production               @relation(fields: [productionId], references: [id], onDelete: Cascade)
   cues         RundownCueExecution[]
