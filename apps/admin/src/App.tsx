@@ -38,6 +38,7 @@ export default function App() {
   const [apiConnection, setApiConnection] = useState<"checking" | "connected" | "offline">("checking");
   const [streamConnection, setStreamConnection] = useState<"checking" | "connected" | "offline">("checking");
   const [runReady, setRunReady] = useState(false);
+  const [runCueIndex, setRunCueIndex] = useState(0);
   const [channels, setChannels] = useState<Channel[]>([]);
   const [productions, setProductions] = useState<Production[]>([]);
   const [rundowns, setRundowns] = useState<Rundown[]>([]);
@@ -169,6 +170,13 @@ export default function App() {
     return () => { active = false; window.clearInterval(interval); };
   }, []);
   useEffect(() => { if (workspace !== "run") setRunReady(false); }, [workspace]);
+  useEffect(() => {
+    setRunCueIndex((current) => {
+      const firstPending = rundown.findIndex((cue) => cue.enabled && cue.status === "pending");
+      if (firstPending >= 0 && (current >= rundown.length || rundown[current]?.status === "complete")) return firstPending;
+      return Math.max(0, Math.min(current, Math.max(0, rundown.length - 1)));
+    });
+  }, [rundown]);
 
   const send = async (body: Record<string, unknown>, success: string) => {
     setStatus(""); setError("");
@@ -252,6 +260,8 @@ export default function App() {
     const result = await mutate(`/api/rundown/live/sessions?rundownId=${encodeURIComponent(rundownId)}`, "POST", {}, "Live session started", fetchRundown);
     if (result) setRunReady(true);
   };
+  const runCue = rundown[runCueIndex];
+  const nextRunCue = rundown.slice(runCueIndex + 1).find((cue) => cue.enabled && cue.status !== "complete");
 
   return <div className={`container workspace workspace--${workspace}`}>
     <header className="admin-shell__header"><div><a className="admin-shell__brand" href="/admin/productions" onClick={(event) => { event.preventDefault(); navigate({ workspace: "productions" }); }}>ShowGather</a><p>{workspace === "run" ? "Focused live operation" : workspace === "rehearse" ? "Safe rehearsal — no live presentation changes" : "Prepare saved productions and rundowns"}</p></div><div><p className={`connection connection--${apiConnection}`}>API {apiConnection}</p><p className={`connection connection--${streamConnection}`}>Stream {streamConnection}</p></div></header>
@@ -317,7 +327,7 @@ export default function App() {
 
     {workspace === "run" && runReady && <section className="section run-preview"><h2>Programme preview</h2>{programmePreviewUrl && <iframe title="Programme Player preview" src={programmePreviewUrl} className="player-preview" />}</section>}
 
-    {workspace !== "prepare" && (workspace !== "run" || runReady) && <section className="section quick-cues">
+    {workspace === "rehearse" && <section className="section quick-cues">
       <h2>On-air cues</h2>
       <div className="cue-grid">
         <button onClick={() => send({ cue: "goal-home", durationMs: 15_000 }, "Home Goal sent")}>⚽ Home Goal</button>
@@ -328,7 +338,14 @@ export default function App() {
       <p className="hint">Safe Clear removes presentation only. The programme video continues uninterrupted.</p>
     </section>}
 
-    {workspace !== "prepare" && (workspace !== "run" || runReady) && <section className="section">
+    {workspace === "run" && runReady && <section className="section run-console" aria-label="Live cue control">
+      <div className="run-console__cue"><span className="run-console__eyebrow">Current cue</span><h2>{runCue?.label ?? "No enabled cue remaining"}</h2><p>{runCue ? `${runCue.order}. ${runCue.status}` : "The rundown is complete or has no enabled cues."}</p></div>
+      <div className="run-console__next"><span>Next</span><strong>{nextRunCue?.label ?? "—"}</strong></div>
+      <div className="run-console__actions"><button disabled={runCueIndex === 0} onClick={() => setRunCueIndex((index) => Math.max(0, index - 1))}>Previous</button><button className="run-console__go" disabled={!runCue || !runCue.enabled || runCue.status === "active" || runCue.status === "cancelled"} onClick={() => { if (runCue) goCue(runCue); }}>{runCue?.status === "failed" ? "Retry cue" : "GO"}</button><button className="safe-clear" onClick={() => send({ action: "safe-clear" }, "Safe Clear sent")}>Safe Clear</button></div>
+      <div className="run-console__list" aria-label="Rundown cue navigation">{rundown.map((cue, index) => <button key={cue.id} className={index === runCueIndex ? "active" : ""} disabled={!cue.enabled} onClick={() => setRunCueIndex(index)}>{cue.order}. {cue.label}<span>{cue.status}</span></button>)}</div>
+    </section>}
+
+    {workspace === "rehearse" && <section className="section">
       <h2>Rundown — {rehearsal ? "Rehearsal" : "Live"}</h2>
       <p className="hint">GO uses an idempotent execution ID. Completed cues require explicit re-run; rehearsal state is separate from live.</p>
       <button disabled={!rundownId} onClick={() => mutate(`/api/rundown/${rehearsal ? "rehearsal" : "live"}/sessions?rundownId=${encodeURIComponent(rundownId)}`, "POST", {}, `${rehearsal ? "Rehearsal" : "Live"} session started`, fetchRundown)}>Start new {rehearsal ? "rehearsal" : "live"} session</button>
@@ -370,7 +387,7 @@ export default function App() {
     </section>}
     <section className="section"><h2>Live dispatch status</h2>
       {outbox.length === 0 ? <p className="empty">No durable commands have been submitted.</p> : <table className="events-table"><thead><tr><th>Command</th><th>Revision</th><th>Status</th><th>Action</th></tr></thead><tbody>
-        {outbox.map((item) => <tr key={item.id}><td>{item.label}<br /><span className="hint mono">{item.eventId}</span>{item.error && <p className="error-msg">{item.error}</p>}</td><td>{item.revision}</td><td>{item.status}</td><td>{item.retryable && <button onClick={() => resolveOutbox(item, "retry")}>Retry</button>}{item.cancellable && <button className="safe-clear" onClick={() => resolveOutbox(item, "cancel")}>Cancel</button>}</td></tr>)}
+        {outbox.map((item) => <tr key={item.id}><td>{item.label}{workspace !== "run" && <><br /><span className="hint mono">{item.eventId}</span></>}{item.error && <p className="error-msg">{item.error}</p>}</td><td>{item.revision}</td><td>{item.status}</td><td>{item.retryable && <button onClick={() => resolveOutbox(item, "retry")}>Retry</button>}{item.cancellable && <button className="safe-clear" onClick={() => resolveOutbox(item, "cancel")}>Cancel</button>}</td></tr>)}
       </tbody></table>}
     </section>
   </div>;
