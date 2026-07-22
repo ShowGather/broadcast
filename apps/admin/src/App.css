@@ -108,6 +108,7 @@ body {
   font-size: 0.95rem;
 }
 .form select { padding: 8px 10px; border: 1px solid #333; border-radius: 4px; background: #1a1a1a; color: #e0e0e0; font-size: .95rem; }
+.panel-options { display: flex; flex-wrap: wrap; gap: 8px 14px; border: 1px solid #334155; border-radius: 6px; padding: 10px; color: #b6c3d4; }.panel-options legend { padding: 0 4px; color: #aab8ca; font-size: .82rem; }.panel-options label { display: flex; align-items: center; gap: 5px; text-transform: capitalize; }.panel-options input { accent-color: #73e3ff; }
 
 .form input:focus {
   outline: none;

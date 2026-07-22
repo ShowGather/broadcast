@@ -42,6 +42,7 @@ function ViewerExperience() {
   const [profile, setProfile] = useState<ViewerProfile>(requestedProfile === "mobile" || requestedProfile === "tv" ? requestedProfile : "desktop");
   const rehearsal = search.get("rehearsal") === "1";
   const embedded = search.get("embedded") === "1";
+  const diagnosticsEnabled = search.get("diagnostics") === "1";
   const productionId = search.get("productionId");
   const channelId = window.location.pathname.match(/^\/player\/([^/]+)/)?.[1];
   const [viewerContext, setViewerContext] = useState<ViewerContext>(defaultViewerContext);
@@ -105,13 +106,13 @@ function ViewerExperience() {
 
   return <div className={`app ${embedded ? "app--embedded" : ""}`} style={{ "--viewer-accent": viewerContext.accent } as CSSProperties}>
     {!embedded && <header className="app-header">
-      <div><span className="viewer-context__live">{viewerContext.liveLabel}</span><h1>{viewerContext.programmeTitle}</h1><span className="status">{viewerContext.programmeSubtitle ?? status}{rehearsal ? " • rehearsal listener active" : ""}</span></div>
+      <div><span className="viewer-context__live">{viewerContext.liveLabel}</span><h1>{viewerContext.programmeTitle}</h1><span className="status" role="status">{viewerContext.programmeSubtitle ?? status}{rehearsal ? " • rehearsal listener active" : ""}</span></div>
       <div className="profile-switcher" aria-label="Preview profile">
         {(["desktop", "mobile", "tv"] as ViewerProfile[]).map((candidate) => <button key={candidate} className={profile === candidate ? "active" : ""} onClick={() => setProfile(candidate)}>{candidate}</button>)}
       </div>
     </header>}
-    {embedded && <p className="embedded-status">{viewerContext.liveLabel} · {viewerContext.programmeTitle}{channelId ? ` · channel ${channelId}` : ""}{rehearsal ? " · rehearsal" : ""}</p>}
-    <ViewerShell profile={profile} video={video} diagnostics={diagnostics} enabledPanels={viewerContext.enabledPanels} panelLabels={viewerContext.panelLabels} />
+    {embedded && <p className="embedded-status" role="status">{viewerContext.liveLabel} · {viewerContext.programmeTitle}{channelId ? ` · channel ${channelId}` : ""}{rehearsal ? " · rehearsal" : ""}</p>}
+    <ViewerShell profile={profile} video={video} diagnostics={diagnosticsEnabled ? diagnostics : null} enabledPanels={viewerContext.enabledPanels} panelLabels={viewerContext.panelLabels} />
   </div>;
 }
 
