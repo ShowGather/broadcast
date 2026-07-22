@@ -39,6 +39,7 @@ Operator rundown or direct control
 Prerequisites: Docker Desktop or OrbStack, Node 20+, and pnpm 10+.
 
 ```bash
+cp .env.example .env
 pnpm install
 pnpm pilot:up
 ```
@@ -52,6 +53,9 @@ Allow roughly a minute for stream health and services. Open:
 - API health: `http://localhost:3001/api/health`
 
 See [Pilot Demonstration Runbook](docs/Pilot%20Demonstration%20Runbook.md) for the repeatable rundown, rehearsal flow, recovery checks, logs, reset procedure, and screenshots.
+
+The local PostgreSQL workflow, committed migrations, seed data, and outbox
+semantics are documented in [Database Development Guide](docs/Database%20Development%20Guide.md).
 
 For the technical system overview, see [V1 Architecture](docs/V1%20Architecture.md).
 
@@ -102,7 +106,8 @@ CI reproduces builds, TypeScript tests, and TS-segmenter Go tests. Browser/HLS t
 
 ## Known V1 limitations
 
-- Shows, rundown state, snapshots, and audit history are in-memory only.
+- PostgreSQL persistence is local-pilot infrastructure; no production backup,
+  high-availability, or multi-operator deployment has been implemented.
 - No accounts, authentication, roles, or multi-operator collaboration.
 - No asset/template library or general plugin system.
 - Compose is local demonstration infrastructure, not production packaging, CDN delivery, or observability.

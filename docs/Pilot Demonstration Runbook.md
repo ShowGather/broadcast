@@ -7,6 +7,7 @@ From `broadcast/`:
 Prerequisites: Docker Desktop or OrbStack, Node 20+, and pnpm 10+.
 
 ```bash
+cp .env.example .env
 pnpm pilot:up
 ```
 
@@ -23,14 +24,22 @@ Stop the local stack with `pnpm pilot:down`.
 If startup takes longer than a minute, inspect service state and logs:
 
 ```bash
-docker compose -f deploy/compose/docker-compose.yml ps
-docker compose -f deploy/compose/docker-compose.yml logs --tail=100 api stream player admin
+docker compose --env-file .env -f deploy/compose/docker-compose.yml ps
+docker compose --env-file .env -f deploy/compose/docker-compose.yml logs --tail=100 api stream player admin
 ```
 
-To reset the local pilot completely, including the HLS volume, run the following destructive local-only command:
+To reset only the local database, including reapplying migrations and demo seed
+data, run:
 
 ```bash
-docker compose -f deploy/compose/docker-compose.yml down -v
+pnpm db:reset
+```
+
+To reset the local pilot completely, including the HLS and PostgreSQL volumes,
+run the following destructive local-only command:
+
+```bash
+docker compose --env-file .env -f deploy/compose/docker-compose.yml down -v
 ```
 
 The browser acceptance evidence was captured with Safari Technology Preview on 22 July 2026.
@@ -65,6 +74,10 @@ Switch Admin to rehearsal mode and use the same rundown. Only the viewer opened 
 - [ ] Seeking forward discards already-passed transient cues per the documented POC policy.
 - [ ] A newly opened viewer receives the current durable score/ticker snapshot.
 - [ ] Refresh/reconnect does not allow an older snapshot to overwrite a newer revision.
+- [ ] Restart the API after a durable score/ticker update; the same published
+  revision is returned from the snapshot endpoint.
+- [ ] A failed injector dispatch is shown as failed/pending and does not mark a
+  rundown cue complete or update the late-join snapshot.
 
 ## Pilot labelling
 
