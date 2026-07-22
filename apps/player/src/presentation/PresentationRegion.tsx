@@ -35,14 +35,17 @@ function placementStyle(instance: ResolvedPresentationInstance): CSSProperties {
   const translateX = placement.anchor.endsWith("centre") ? "-50%" : "0";
   const translateY = placement.anchor.startsWith("centre") ? "-50%" : "0";
   const stackOffset = placement.layout === "column" ? instance.stackIndex * (placement.anchor.startsWith("bottom") ? -112 : 112) : 0;
+  const rowOffset = placement.layout === "row" ? instance.stackIndex * 108 : 0;
+  const crop = placement.crop;
   return {
     ...horizontal,
     ...vertical,
     width: `${placement.width * 100}%`,
     ...(placement.height === undefined ? {} : { height: `${placement.height * 100}%` }),
     ...(placement.opacity === undefined ? {} : { opacity: placement.opacity }),
-    transform: `translate(${translateX}, calc(${translateY} + ${stackOffset}%)) rotate(${placement.rotation ?? 0}deg)`,
+    transform: `translate(calc(${translateX} + ${rowOffset}%), calc(${translateY} + ${stackOffset}%)) rotate(${placement.rotation ?? 0}deg)`,
     zIndex: instance.entry.zIndex ?? instance.entry.priority,
+    ...(crop === undefined ? {} : { clipPath: `inset(${crop.top * 100}% ${crop.right * 100}% ${crop.bottom * 100}% ${crop.left * 100}%)` }),
     transitionDuration: `${instance.transition.durationMs}ms`,
     animationDuration: `${instance.transition.durationMs}ms`,
   };

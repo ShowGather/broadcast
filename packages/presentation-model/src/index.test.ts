@@ -138,3 +138,12 @@ test("column placements stack deterministically while overlay placements retain 
   for (const id of ["a", "b"]) state = applyPresentationCommand(state, { action: "activate", eventId: id, targetPts: 1, region: "video.overlay", layer: "lower", instanceId: id, item: { kind: "lower-third", title: id }, placementByProfile: { desktop: { surface: "video", anchor: "bottom-left", x: .04, y: .04, width: .4, safeArea: true, layout: "column" } } });
   assert.deepEqual(resolvePresentationTarget(state, "video.overlay", "desktop").map((item) => item.stackIndex), [0, 1]);
 });
+
+test("row and single collision policies are deterministic", () => {
+  let state = createPresentationState();
+  for (const id of ["a", "b"]) state = applyPresentationCommand(state, { action: "activate", eventId: id, targetPts: 1, region: "video.overlay", layer: "lower", instanceId: id, zIndex: id === "a" ? 10 : 20, item: { kind: "lower-third", title: id } });
+  const rowDefinitions = ["a", "b"].map((instanceId) => ({ instanceId, placementByProfile: { desktop: { surface: "video" as const, anchor: "bottom-left" as const, x: .04, y: .04, width: .4, safeArea: true, layout: "row" as const } } }));
+  assert.deepEqual(resolvePresentationTarget(state, "video.overlay", "desktop", rowDefinitions).map((item) => item.stackIndex), [0, 1]);
+  const single = resolvePresentationTarget(state, "video.overlay", "desktop", rowDefinitions.map((definition) => ({ ...definition, placementByProfile: { desktop: { ...definition.placementByProfile.desktop, layout: "single" as const } } })));
+  assert.deepEqual(single.map((item) => item.entry.instanceId), ["b"]);
+});

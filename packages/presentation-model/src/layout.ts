@@ -108,10 +108,17 @@ export function resolvePresentationTarget(state: PresentationState, target: Pres
     .map((entry) => resolvePresentationInstance(entry, profile, definitions))
     .filter((instance) => targetMatches(instance, target, profile))
     .sort((a, b) => (a.entry.zIndex ?? a.entry.priority) - (b.entry.zIndex ?? b.entry.priority) || a.entry.layer.localeCompare(b.entry.layer) || a.entry.instanceId.localeCompare(b.entry.instanceId));
+  const occupiedSingles = new Set<string>();
+  const visible = [...instances].reverse().filter((instance) => {
+    const key = `${instance.placement.surface}:${instance.placement.anchor}`;
+    if (instance.placement.layout !== "single") return true;
+    if (occupiedSingles.has(key)) return false;
+    occupiedSingles.add(key); return true;
+  }).reverse();
   const stacks = new Map<string, number>();
-  return instances.map((instance) => {
+  return visible.map((instance) => {
     const key = `${instance.placement.surface}:${instance.placement.anchor}:${instance.placement.layout}`;
-    const stackIndex = instance.placement.layout === "column" ? (stacks.get(key) ?? 0) : 0;
+    const stackIndex = instance.placement.layout === "column" || instance.placement.layout === "row" ? (stacks.get(key) ?? 0) : 0;
     stacks.set(key, stackIndex + 1);
     return { ...instance, stackIndex };
   });

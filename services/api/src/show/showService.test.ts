@@ -47,7 +47,7 @@ test("profile-aware layout definitions are persisted as bounded production confi
   const data = await fixture();
   try {
     const show = new ShowService(prisma!);
-    const configuration = { presentationInstances: [{ id: "scorebug-main", kind: "scorebug", label: "Main scorebug", enabled: true }], presentationLayouts: [{ instanceId: "scorebug-main", placementByProfile: { tv: { surface: "video", anchor: "top-left", x: .04, y: .04, width: .28, safeArea: true, layout: "overlay" } }, zIndex: 20, transition: { enter: "fade", exit: "fade", durationMs: 180 } }] };
+    const configuration = { presentationInstances: [{ id: "scorebug-main", kind: "scorebug", label: "Main scorebug", enabled: true }], presentationLayouts: [{ instanceId: "scorebug-main", placementByProfile: { tv: { surface: "video", anchor: "top-left", x: .04, y: .04, width: .28, opacity: .8, rotation: 4, crop: { top: 0, right: .1, bottom: 0, left: 0 }, safeArea: true, layout: "row" } }, zIndex: 20, transition: { enter: "fade", exit: "fade", durationMs: 180 } }] };
     const production = await show.createProduction(data.channel.id, { title: "Match", configuration });
     const saved = await prisma!.production.findUniqueOrThrow({ where: { id: production.id } });
     assert.deepEqual(saved.configuration, configuration);

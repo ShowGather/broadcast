@@ -16,7 +16,7 @@ interface OutboxItem { id: string; eventId: string; revision: number; label: str
 type LayoutProfile = "desktop" | "tv" | "mobile";
 type LayoutSurface = "video" | "surround" | "companion";
 type LayoutAnchor = "top-left" | "top-centre" | "top-right" | "centre-left" | "centre" | "centre-right" | "bottom-left" | "bottom-centre" | "bottom-right";
-interface LayoutDefinition { instanceId: string; placementByProfile: Partial<Record<LayoutProfile, { surface: LayoutSurface; anchor: LayoutAnchor; x: number; y: number; width: number; safeArea?: boolean; layout: "single" | "column" | "overlay" }>>; variantByProfile?: Partial<Record<LayoutProfile, string>>; zIndex?: number; transition?: { enter: "cut" | "fade" | "slide" | "scale"; exit: "cut" | "fade" | "slide" | "scale"; durationMs: number }; }
+interface LayoutDefinition { instanceId: string; placementByProfile: Partial<Record<LayoutProfile, { surface: LayoutSurface; anchor: LayoutAnchor; x: number; y: number; width: number; height?: number; crop?: { top: number; right: number; bottom: number; left: number }; opacity?: number; rotation?: number; safeArea?: boolean; layout: "single" | "row" | "column" | "overlay" }>>; variantByProfile?: Partial<Record<LayoutProfile, string>>; zIndex?: number; transition?: { enter: "cut" | "fade" | "slide" | "scale"; exit: "cut" | "fade" | "slide" | "scale"; durationMs: number }; }
 
 const placementPreset = (surface: LayoutSurface, anchor: LayoutAnchor) => {
   const x = anchor.endsWith("left") || anchor.endsWith("right") ? .04 : 0;
@@ -93,8 +93,15 @@ export default function App() {
   const [layoutX, setLayoutX] = useState(.04);
   const [layoutY, setLayoutY] = useState(.04);
   const [layoutWidth, setLayoutWidth] = useState(.36);
+  const [layoutHeight, setLayoutHeight] = useState<number | "">("");
+  const [layoutOpacity, setLayoutOpacity] = useState(1);
+  const [layoutRotation, setLayoutRotation] = useState(0);
+  const [layoutCropTop, setLayoutCropTop] = useState(0);
+  const [layoutCropRight, setLayoutCropRight] = useState(0);
+  const [layoutCropBottom, setLayoutCropBottom] = useState(0);
+  const [layoutCropLeft, setLayoutCropLeft] = useState(0);
   const [layoutSafeArea, setLayoutSafeArea] = useState(true);
-  const [layoutPolicy, setLayoutPolicy] = useState<"single" | "column" | "overlay">("overlay");
+  const [layoutPolicy, setLayoutPolicy] = useState<"single" | "row" | "column" | "overlay">("overlay");
   const [layoutVariant, setLayoutVariant] = useState("standard");
   const [layoutZIndex, setLayoutZIndex] = useState(10);
   const [transitionKind, setTransitionKind] = useState<"cut" | "fade" | "slide" | "scale">("fade");
@@ -335,7 +342,7 @@ export default function App() {
   const runCue = rundown[runCueIndex];
   const nextRunCue = rundown.slice(runCueIndex + 1).find((cue) => cue.enabled && cue.status !== "complete");
   const saveLayoutPreset = () => setPresentationLayouts((current) => {
-    const placement = { ...placementPreset(layoutSurface, layoutAnchor), x: layoutX, y: layoutY, width: layoutWidth, safeArea: layoutSafeArea, layout: layoutPolicy };
+    const placement = { ...placementPreset(layoutSurface, layoutAnchor), x: layoutX, y: layoutY, width: layoutWidth, ...(layoutHeight === "" ? {} : { height: layoutHeight }), opacity: layoutOpacity, rotation: layoutRotation, crop: { top: layoutCropTop, right: layoutCropRight, bottom: layoutCropBottom, left: layoutCropLeft }, safeArea: layoutSafeArea, layout: layoutPolicy };
     const existing = current.find((definition) => definition.instanceId === layoutInstanceId);
     const transition = { enter: transitionKind, exit: transitionKind, durationMs: transitionDuration };
     if (existing) return current.map((definition) => definition.instanceId === layoutInstanceId ? { ...definition, placementByProfile: { ...definition.placementByProfile, [layoutProfile]: placement }, variantByProfile: { ...definition.variantByProfile, [layoutProfile]: layoutVariant }, zIndex: layoutZIndex, transition } : definition);
@@ -372,7 +379,7 @@ export default function App() {
     };
     const selected = defaults[kind];
     const placement = placementPreset(selected.surface, selected.anchor);
-    setSelectedElement(kind); if (selected.command) setCommandKind(selected.command); setCommandInstanceId(selected.instanceId); setLayoutInstanceId(selected.instanceId); setLayoutSurface(selected.surface); setLayoutAnchor(selected.anchor); setLayoutX(placement.x); setLayoutY(placement.y); setLayoutWidth(placement.width); setLayoutSafeArea(placement.safeArea ?? false); setLayoutPolicy(placement.layout === "column" ? "column" : "overlay");
+    setSelectedElement(kind); if (selected.command) setCommandKind(selected.command); setCommandInstanceId(selected.instanceId); setLayoutInstanceId(selected.instanceId); setLayoutSurface(selected.surface); setLayoutAnchor(selected.anchor); setLayoutX(placement.x); setLayoutY(placement.y); setLayoutWidth(placement.width); setLayoutHeight(""); setLayoutOpacity(1); setLayoutRotation(0); setLayoutCropTop(0); setLayoutCropRight(0); setLayoutCropBottom(0); setLayoutCropLeft(0); setLayoutSafeArea(placement.safeArea ?? false); setLayoutPolicy(placement.layout === "column" ? "column" : "overlay");
     setStatus(`${kind} selected. Choose a profile and apply a placement preset, then configure its typed command.`);
   };
   const currentShowConfiguration = () => ({ sport: "football", homeTeam, awayTeam, tickerLabel, ...(programmeTitle.trim() ? { programmeTitle: programmeTitle.trim() } : {}), ...(programmeSubtitle.trim() ? { programmeSubtitle: programmeSubtitle.trim() } : {}), ...(liveLabel.trim() ? { liveLabel: liveLabel.trim() } : {}), accent, enabledCompanionPanels: enabledPanels, companionPanelLabels: { match: matchPanelLabel.trim() || "Match", info: infoPanelLabel.trim() || "Info", partners: partnersPanelLabel.trim() || "Partners", interact: interactPanelLabel.trim() || "Interact" }, ...(presentationInstances.length ? { presentationInstances } : {}), ...(presentationLayouts.length ? { presentationLayouts } : {}) });
@@ -455,8 +462,10 @@ export default function App() {
           <label><span>Surface</span><select value={layoutSurface} onChange={(event) => setLayoutSurface(event.target.value as LayoutSurface)}>{(["video", "surround", "companion"] as const).map((surface) => <option key={surface}>{surface}</option>)}</select></label>
           <label><span>Preset</span><select value={layoutAnchor} onChange={(event) => setLayoutAnchor(event.target.value as LayoutAnchor)}>{(["top-left", "top-centre", "top-right", "centre-left", "centre", "centre-right", "bottom-left", "bottom-centre", "bottom-right"] as const).map((anchor) => <option key={anchor}>{anchor}</option>)}</select></label>
           <label><span>Profile variant</span><select value={layoutVariant} onChange={(event) => setLayoutVariant(event.target.value)}><option value="standard">Standard</option><option value="wide">Wide</option><option value="broadcast">Broadcast</option><option value="compact">Compact</option><option value="headline">Headline</option></select></label>
-          <label><span>Horizontal offset</span><input type="number" min={0} max={1} step={.01} value={layoutX} onChange={(event) => setLayoutX(Number(event.target.value))} /></label><label><span>Vertical offset</span><input type="number" min={0} max={1} step={.01} value={layoutY} onChange={(event) => setLayoutY(Number(event.target.value))} /></label><label><span>Width</span><input type="number" min={.08} max={1} step={.01} value={layoutWidth} onChange={(event) => setLayoutWidth(Number(event.target.value))} /></label>
-          <label><span>Collision policy</span><select value={layoutPolicy} onChange={(event) => setLayoutPolicy(event.target.value as "single" | "column" | "overlay")}><option value="overlay">Overlay</option><option value="column">Stack in column</option><option value="single">Single slot</option></select></label><label><span>Title/action safe area</span><input type="checkbox" checked={layoutSafeArea} onChange={(event) => setLayoutSafeArea(event.target.checked)} /></label>
+          <label><span>Horizontal offset</span><input type="number" min={0} max={1} step={.01} value={layoutX} onChange={(event) => setLayoutX(Number(event.target.value))} /></label><label><span>Vertical offset</span><input type="number" min={0} max={1} step={.01} value={layoutY} onChange={(event) => setLayoutY(Number(event.target.value))} /></label><label><span>Width</span><input type="number" min={.08} max={1} step={.01} value={layoutWidth} onChange={(event) => setLayoutWidth(Number(event.target.value))} /></label><label><span>Height (optional)</span><input type="number" min={0} max={1} step={.01} value={layoutHeight} onChange={(event) => setLayoutHeight(event.target.value === "" ? "" : Number(event.target.value))} /></label>
+          <label><span>Opacity</span><input type="number" min={0} max={1} step={.05} value={layoutOpacity} onChange={(event) => setLayoutOpacity(Number(event.target.value))} /></label><label><span>Rotation</span><input type="number" min={-180} max={180} step={1} value={layoutRotation} onChange={(event) => setLayoutRotation(Number(event.target.value))} /></label>
+          <label><span>Crop top</span><input type="number" min={0} max={1} step={.01} value={layoutCropTop} onChange={(event) => setLayoutCropTop(Number(event.target.value))} /></label><label><span>Crop right</span><input type="number" min={0} max={1} step={.01} value={layoutCropRight} onChange={(event) => setLayoutCropRight(Number(event.target.value))} /></label><label><span>Crop bottom</span><input type="number" min={0} max={1} step={.01} value={layoutCropBottom} onChange={(event) => setLayoutCropBottom(Number(event.target.value))} /></label><label><span>Crop left</span><input type="number" min={0} max={1} step={.01} value={layoutCropLeft} onChange={(event) => setLayoutCropLeft(Number(event.target.value))} /></label>
+          <label><span>Collision policy</span><select value={layoutPolicy} onChange={(event) => setLayoutPolicy(event.target.value as "single" | "row" | "column" | "overlay")}><option value="overlay">Overlay</option><option value="row">Stack in row</option><option value="column">Stack in column</option><option value="single">Single slot</option></select></label><label><span>Title/action safe area</span><input type="checkbox" checked={layoutSafeArea} onChange={(event) => setLayoutSafeArea(event.target.checked)} /></label>
           <label><span>Layer order</span><input type="number" min={0} max={999} step={1} value={layoutZIndex} onChange={(event) => setLayoutZIndex(Number(event.target.value))} /></label>
           <label><span>Transition</span><select value={transitionKind} onChange={(event) => setTransitionKind(event.target.value as "cut" | "fade" | "slide" | "scale")}><option value="cut">Cut</option><option value="fade">Fade</option><option value="slide">Slide</option><option value="scale">Scale</option></select></label>
           <label><span>Transition duration (ms)</span><input type="number" min={0} max={5000} step={10} value={transitionDuration} onChange={(event) => setTransitionDuration(Number(event.target.value))} /></label>

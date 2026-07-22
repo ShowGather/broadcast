@@ -9,6 +9,17 @@ function first(items: PresentationItem[], kind: PresentationItem["kind"]) {
   return items.find((item) => item.kind === kind);
 }
 
+function CompanionGraphic({ item }: { item: PresentationItem }) {
+  switch (item.kind) {
+    case "scorebug": return <div><strong>{item.homeTeam} <b>{item.homeScore}</b> – <b>{item.awayScore}</b> {item.awayTeam}</strong><span>{item.clock ?? "Live"}</span></div>;
+    case "ticker": return <div><strong>{item.label ?? "SHOWGATHER LIVE"}</strong><span>{item.text}</span></div>;
+    case "sponsor-panel": return <div><strong>{item.brand}</strong><span>{item.tagline}</span></div>;
+    case "lower-third": return <div><strong>{item.title}</strong>{item.subtitle && <span>{item.subtitle}</span>}</div>;
+    case "alert": return <div><strong>{item.title}</strong><span>{item.message}</span></div>;
+    case "clock": return <div><strong>{item.label ?? "LIVE"}</strong><span>{item.time}</span></div>;
+  }
+}
+
 export function InteractivePanels({ enabled = ["match", "info", "partners", "interact"], labels = {}, layoutDefinitions = [] }: { enabled?: CompanionPanel[]; labels?: CompanionPanelLabels; layoutDefinitions?: readonly PresentationLayoutDefinition[] }) {
   const [panel, setPanel] = useState<CompanionPanel>(enabled[0] ?? "match");
   const tabs = useRef<Array<HTMLButtonElement | null>>([]);
@@ -23,6 +34,9 @@ export function InteractivePanels({ enabled = ["match", "info", "partners", "int
   const ticker = first(footer, "ticker") ?? first(header, "ticker");
   const companion = resolvePresentationSurface(state, "companion", "mobile", layoutDefinitions).map((instance) => instance.entry.item);
   const companionSponsors = companion.filter((item) => item.kind === "sponsor-panel");
+  const companionMatch = companion.filter((item) => item.kind === "scorebug");
+  const companionInformation = companion.filter((item) => item.kind === "ticker" || item.kind === "lower-third" || item.kind === "alert" || item.kind === "clock");
+  const companionInteraction = companion.filter((item) => item.kind !== "scorebug" && item.kind !== "ticker" && item.kind !== "lower-third" && item.kind !== "alert" && item.kind !== "clock" && item.kind !== "sponsor-panel");
   const companionTicker = first(companion, "ticker");
   const informationTicker = companionTicker?.kind === "ticker" ? companionTicker : ticker?.kind === "ticker" ? ticker : undefined;
 
@@ -39,10 +53,10 @@ export function InteractivePanels({ enabled = ["match", "info", "partners", "int
       {enabled.map((candidate, index) => <button key={candidate} ref={(element) => { tabs.current[index] = element; }} id={`companion-tab-${candidate}`} role="tab" aria-selected={panel === candidate} aria-controls={`companion-panel-${candidate}`} tabIndex={panel === candidate ? 0 : -1} className={panel === candidate ? "active" : ""} onKeyDown={(event) => onKeyDown(event, index)} onClick={() => setPanel(candidate)}>{label(candidate)}</button>)}
     </div>
     {panel === "match" && <div id="companion-panel-match" role="tabpanel" aria-labelledby="companion-tab-match" className="interactive-panels__content">
-      {score?.kind === "scorebug" ? <><strong>{score.homeTeam} <b>{score.homeScore}</b> – <b>{score.awayScore}</b> {score.awayTeam}</strong><span>{score.clock ?? "Live"} • presentation follows programme media time</span></> : <span>Waiting for match state…</span>}
+      {companionMatch.length ? companionMatch.map((item, index) => <CompanionGraphic key={`companion-match-${index}`} item={item} />) : score?.kind === "scorebug" ? <><strong>{score.homeTeam} <b>{score.homeScore}</b> – <b>{score.awayScore}</b> {score.awayTeam}</strong><span>{score.clock ?? "Live"} • presentation follows programme media time</span></> : <span>Waiting for match state…</span>}
     </div>}
-    {panel === "info" && <div id="companion-panel-info" role="tabpanel" aria-labelledby="companion-tab-info" className="interactive-panels__content">{informationTicker ? <><strong>{informationTicker.label ?? "SHOWGATHER LIVE"}</strong><span>{informationTicker.text}</span></> : <span>Programme information will appear here.</span>}</div>}
+    {panel === "info" && <div id="companion-panel-info" role="tabpanel" aria-labelledby="companion-tab-info" className="interactive-panels__content">{companionInformation.length ? companionInformation.map((item, index) => <CompanionGraphic key={`companion-info-${index}`} item={item} />) : informationTicker ? <><strong>{informationTicker.label ?? "SHOWGATHER LIVE"}</strong><span>{informationTicker.text}</span></> : <span>Programme information will appear here.</span>}</div>}
     {panel === "partners" && <div id="companion-panel-partners" role="tabpanel" aria-labelledby="companion-tab-partners" className="interactive-panels__content">{[...companionSponsors, ...sponsors].length ? [...companionSponsors, ...sponsors].map((sponsor, index) => sponsor.kind === "sponsor-panel" && <div key={`${sponsor.brand}-${index}`}><strong>{sponsor.brand}</strong><span>{sponsor.tagline}</span></div>) : <span>No partner content is active.</span>}</div>}
-    {panel === "interact" && <div id="companion-panel-interact" role="tabpanel" aria-labelledby="companion-tab-interact" className="interactive-panels__content"><strong>Interactive</strong><span>Audience choices and live participation will appear here when enabled for this programme.</span></div>}
+    {panel === "interact" && <div id="companion-panel-interact" role="tabpanel" aria-labelledby="companion-tab-interact" className="interactive-panels__content">{companionInteraction.length ? companionInteraction.map((item, index) => <CompanionGraphic key={`companion-interact-${index}`} item={item} />) : <><strong>Interactive</strong><span>Audience choices and live participation will appear here when enabled for this programme.</span></>}</div>}
   </section>;
 }

@@ -68,6 +68,7 @@ function validatePresentationLayouts(value: unknown) {
   const profiles = new Set(["desktop", "tv", "mobile"]);
   const surfaces = new Set(["video", "surround", "companion"]);
   const anchors = new Set(["top-left", "top-centre", "top-right", "centre-left", "centre", "centre-right", "bottom-left", "bottom-centre", "bottom-right"]);
+  const layouts = new Set(["single", "row", "column", "overlay"]);
   const ids = new Set<string>();
   for (const layout of value) {
     if (typeof layout !== "object" || layout === null || Array.isArray(layout)) throw new Error("presentationLayouts contains an invalid definition");
@@ -84,6 +85,11 @@ function validatePresentationLayouts(value: unknown) {
       if (!surfaces.has(String(item.surface)) || !anchors.has(String(item.anchor))) throw new Error("placement requires a supported surface and anchor");
       for (const coordinate of ["x", "y", "width"] as const) if (typeof item[coordinate] !== "number" || !Number.isFinite(item[coordinate]) || item[coordinate] < 0 || item[coordinate] > 1) throw new Error(`placement ${coordinate} must be a normalised number`);
       if (item.height !== undefined && (typeof item.height !== "number" || !Number.isFinite(item.height) || item.height < 0 || item.height > 1)) throw new Error("placement height must be a normalised number");
+      if (item.opacity !== undefined && (typeof item.opacity !== "number" || !Number.isFinite(item.opacity) || item.opacity < 0 || item.opacity > 1)) throw new Error("placement opacity must be a normalised number");
+      if (item.rotation !== undefined && (typeof item.rotation !== "number" || !Number.isFinite(item.rotation) || item.rotation < -180 || item.rotation > 180)) throw new Error("placement rotation must be between -180 and 180");
+      if (item.layout !== undefined && !layouts.has(String(item.layout))) throw new Error("placement layout is unsupported");
+      if (item.safeArea !== undefined && typeof item.safeArea !== "boolean") throw new Error("placement safeArea must be boolean");
+      if (item.crop !== undefined) { const crop = item.crop as Record<string, unknown>; if (typeof crop !== "object" || crop === null || ["top", "right", "bottom", "left"].some((edge) => typeof crop[edge] !== "number" || !Number.isFinite(crop[edge]) || Number(crop[edge]) < 0 || Number(crop[edge]) > 1)) throw new Error("placement crop must use normalised edges"); }
     }
   }
 }
