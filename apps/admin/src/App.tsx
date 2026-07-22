@@ -336,6 +336,7 @@ export default function App() {
     </nav>
 
     {workspace === "prepare" && <nav className="prepare-tabs" aria-label="Prepare workspace sections">{(["overview", "rundown", "viewer", "configuration"] as PrepareTab[]).map((tab) => <button key={tab} className={(route.prepareTab ?? "overview") === tab ? "active" : ""} onClick={() => navigate({ workspace: "prepare", productionId, prepareTab: tab })}>{tab === "configuration" ? "Show configuration" : tab}</button>)}</nav>}
+    {workspace === "rehearse" && <section className="rehearsal-banner" role="status"><strong>REHEARSAL OUTPUT ONLY</strong><span>Changes are visible only in opted-in rehearsal Players. Live presentation state will not change.</span></section>}
 
     <section className="section admin-context">
       <h2>{route.workspace === "productions" ? "Choose a production" : `${workspace} · ${selectedProduction?.title ?? "Loading production"}`}</h2>
@@ -452,12 +453,12 @@ export default function App() {
 
     {confirmation && <div className="confirmation-backdrop" role="presentation"><section className="confirmation-dialog" role="alertdialog" aria-modal="true" aria-labelledby="confirmation-title" aria-describedby="confirmation-description"><h2 id="confirmation-title">{confirmation === "complete" ? "Complete this live show?" : confirmation === "abandon" ? "Abandon this live session?" : "Start a new live session?"}</h2><p id="confirmation-description">{confirmation === "complete" ? "The current session will be marked complete. Programme presentation is not cleared automatically." : confirmation === "abandon" ? "The current session will be recorded as abandoned. Programme presentation is not cleared automatically." : "The current live session will be completed and a fresh immutable rundown session will begin."}</p><div><button onClick={() => setConfirmation(null)}>Cancel</button><button ref={confirmationButton} className="danger" onClick={confirmSessionAction}>Confirm</button></div></section></div>}
 
-    {workspace === "rehearse" && <section className="section">
-      <h2>Rundown — {rehearsal ? "Rehearsal" : "Live"}</h2>
+    {workspace === "rehearse" && <section className="section rehearsal-console">
+      <h2>Rehearsal rundown</h2>
       <p className="hint">GO uses an idempotent execution ID. Completed cues require explicit re-run; rehearsal state is separate from live.</p>
       <button disabled={!rundownId} onClick={() => mutate(`/api/rundown/${rehearsal ? "rehearsal" : "live"}/sessions?rundownId=${encodeURIComponent(rundownId)}`, "POST", {}, `${rehearsal ? "Rehearsal" : "Live"} session started`, fetchRundown)}>{rehearsal ? "Reset rehearsal session" : "Start new live session"}</button>
       <div className="cue-grid">
-        {rundown.map((cue) => <div key={cue.id}><strong>{cue.order}. {cue.label}</strong><span className="hint"> {cue.status}</span><button disabled={cue.status === "active" || cue.status === "cancelled"} onClick={() => goCue(cue)}>{cue.status === "failed" ? "Retry" : "GO"}</button>{cue.status === "complete" && <button onClick={() => goCue(cue, true)}>Re-run</button>}</div>)}
+        {rundown.map((cue) => <div key={cue.id}><strong>{cue.order}. {cue.label}</strong><span className="hint"> {cue.status}</span><button disabled={cue.status === "active" || cue.status === "cancelled"} onClick={() => goCue(cue)}>{cue.status === "failed" ? "Retry rehearsal cue" : "GO IN REHEARSAL"}</button>{cue.status === "complete" && <button onClick={() => goCue(cue, true)}>Re-run in rehearsal</button>}</div>)}
       </div>
     </section>}
 
