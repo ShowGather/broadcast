@@ -2,6 +2,8 @@ import type { FastifyInstance } from "fastify";
 import type { PresentationCommandPayload, ShowGatherEvent } from "@showgather/event-schema";
 import { createEvent, dispatchLiveEvent } from "./events.js";
 import { dispatchRehearsalEvent } from "./rehearsal.js";
+import { prisma } from "../database/client.js";
+import { PersistentRundown } from "../rundown/persistentRundown.js";
 
 type Target = "live" | "rehearsal";
 type CueStatus = "pending" | "active" | "complete";
@@ -15,6 +17,7 @@ const cues: RundownCue[] = [
   { id: "partner-takeover", label: "Partner takeover", command: { k: "sponsor", b: "Goal Partner", s: "Celebrating the moment", d: 8_000 } },
 ];
 const states: Record<Target, Map<string, CueState>> = { live: new Map(), rehearsal: new Map() };
+const persistentRundown = process.env.DATABASE_URL ? new PersistentRundown(prisma) : null;
 
 function state(target: Target, cueId: string): CueState { return states[target].get(cueId) ?? { status: "pending" }; }
 function snapshot(target: Target) { return { target, cues: cues.map((cue, index) => ({ ...cue, order: index + 1, ...state(target, cue.id) })) }; }
@@ -22,11 +25,22 @@ function snapshot(target: Target) { return { target, cues: cues.map((cue, index)
 export async function rundownRoutes(app: FastifyInstance) {
   app.get<{ Params: { target: Target } }>("/rundown/:target", async (request, reply) => {
     if (request.params.target !== "live" && request.params.target !== "rehearsal") return reply.status(400).send({ error: "target must be live or rehearsal" });
+    if (persistentRundown) return persistentRundown.snapshot(request.params.target);
     return snapshot(request.params.target);
   });
   app.post<{ Params: { target: Target }; Body: { cueId?: string; rerun?: boolean } }>("/rundown/:target/go", async (request, reply) => {
     const target = request.params.target;
     if (target !== "live" && target !== "rehearsal") return reply.status(400).send({ error: "target must be live or rehearsal" });
+    if (persistentRundown) {
+      try {
+        const result = await persistentRundown.go(target, request.body?.cueId ?? "", request.body?.rerun);
+        const dispatchStatus = "dispatchStatus" in result ? result.dispatchStatus : undefined;
+        if (target === "live" && dispatchStatus === "failed") return reply.status(503).send(result);
+        return reply.status(target === "live" && dispatchStatus === "accepted" ? 202 : 201).send(result);
+      } catch (error) {
+        return reply.status(404).send({ error: error instanceof Error ? error.message : "unable to execute cue" });
+      }
+    }
     const cue = cues.find((candidate) => candidate.id === request.body?.cueId);
     if (!cue) return reply.status(404).send({ error: "cue not found" });
     const prior = state(target, cue.id);

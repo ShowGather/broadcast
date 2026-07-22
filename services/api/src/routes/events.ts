@@ -48,9 +48,9 @@ async function injectLiveEvent(event: ShowGatherEvent): Promise<unknown> {
   return body;
 }
 
-export async function dispatchLiveEvent(event: ShowGatherEvent): Promise<StoredEvent> {
+export async function dispatchLiveEvent(event: ShowGatherEvent, source = "direct-control", executionId?: string): Promise<StoredEvent> {
   if (persistentStore) {
-    const result = await persistentStore.accept(event);
+    const result = await persistentStore.accept(event, source, executionId);
     const stored: StoredEvent = {
       event: result.event,
       injectedAt: new Date().toISOString(),

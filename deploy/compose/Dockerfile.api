@@ -27,4 +27,4 @@ ENV ID3_INJECTOR_HOST=stream
 ENV ID3_INJECTOR_PORT=8080
 ENV PORT=3001
 EXPOSE 3001
-CMD ["sh", "-c", "pnpm --filter @showgather/api db:deploy && node services/api/dist/server.js"]
+CMD ["sh", "-c", "pnpm --filter @showgather/api db:deploy && pnpm --filter @showgather/api db:seed && node services/api/dist/server.js"]

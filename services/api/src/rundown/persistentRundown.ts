@@ -1,0 +1,71 @@
+import type { PrismaClient } from "@prisma/client";
+import type { PresentationCommandPayload, ShowGatherEvent } from "@showgather/event-schema";
+import { createEvent, dispatchLiveEvent } from "../routes/events.js";
+import { dispatchRehearsalEvent } from "../routes/rehearsal.js";
+
+export type RundownTarget = "live" | "rehearsal";
+type CueStatus = "pending" | "active" | "complete";
+const DEFAULT_RUNDOWN_ID = process.env.SHOWGATHER_RUNDOWN_ID ?? "showgather-v1-demonstration";
+
+interface PersistedCue { id: string; label: string; position: number; commandPayload: unknown; enabled: boolean; }
+interface CueView { id: string; label: string; order: number; command: PresentationCommandPayload; enabled: boolean; status: CueStatus; executionId?: string; error?: string; }
+
+export class PersistentRundown {
+  constructor(private readonly db: PrismaClient) {}
+
+  async snapshot(target: RundownTarget) {
+    const rundown = await this.db.rundown.findUniqueOrThrow({ where: { id: DEFAULT_RUNDOWN_ID }, include: { cues: { orderBy: { position: "asc" } }, production: true } });
+    const session = await this.db.rundownExecutionSession.findFirst({ where: { rundownId: rundown.id, mode: target, status: "active" }, orderBy: { startedAt: "desc" }, include: { cues: true } });
+    const executions = new Map(session?.cues.map((execution) => [execution.rundownCueId, execution]) ?? []);
+    return {
+      target,
+      rundownId: rundown.id,
+      productionId: rundown.productionId,
+      cues: rundown.cues.map((cue) => this.view(cue, executions.get(cue.id))),
+    };
+  }
+
+  async go(target: RundownTarget, cueId: string, rerun = false) {
+    const rundown = await this.db.rundown.findUniqueOrThrow({ where: { id: DEFAULT_RUNDOWN_ID }, include: { cues: true } });
+    const cue = rundown.cues.find((candidate) => candidate.id === cueId);
+    if (!cue || !cue.enabled) throw new Error("cue not found or disabled");
+    const session = await this.session(rundown.id, rundown.productionId, target);
+    const previous = await this.db.rundownCueExecution.findFirst({ where: { sessionId: session.id, rundownCueId: cue.id }, orderBy: { createdAt: "desc" } });
+    if (previous?.status === "dispatched" && !rerun) return { ...(await this.snapshot(target)), eventId: previous.executionId, duplicate: true };
+    if (previous?.status === "accepted" && !rerun) return { ...(await this.snapshot(target)), eventId: previous.executionId, duplicate: true };
+
+    const executionId = rerun || !previous ? `run-${target}-${cue.id}-${rerun ? Date.now() : "initial"}` : previous.executionId;
+    const created = createEvent({ command: cue.commandPayload as PresentationCommandPayload });
+    if ("error" in created) throw new Error(created.error);
+    const event = { ...created.event, id: executionId } as ShowGatherEvent;
+    const execution = await this.db.rundownCueExecution.upsert({
+      where: { executionId },
+      update: { status: "accepted", error: null },
+      create: { sessionId: session.id, rundownCueId: cue.id, executionId, status: "accepted" },
+    });
+
+    if (target === "rehearsal") {
+      const result = dispatchRehearsalEvent(event);
+      await this.db.rundownCueExecution.update({ where: { id: execution.id }, data: { status: "dispatched", executedAt: new Date() } });
+      return { ...(await this.snapshot(target)), event: result.event };
+    }
+
+    const result = await dispatchLiveEvent(event, "rundown", executionId);
+    if (result.status === "dispatched") {
+      await this.db.rundownCueExecution.update({ where: { id: execution.id }, data: { status: "dispatched", revision: result.revision, executedAt: new Date(), error: null } });
+    } else if (result.status === "failed") {
+      await this.db.rundownCueExecution.update({ where: { id: execution.id }, data: { status: "failed", error: String((result.injectionResponse as { error?: string }).error ?? "dispatch failed") } });
+    }
+    return { ...(await this.snapshot(target)), event: result.event, dispatchStatus: result.status };
+  }
+
+  private async session(rundownId: string, productionId: string, mode: RundownTarget) {
+    const current = await this.db.rundownExecutionSession.findFirst({ where: { rundownId, mode, status: "active" }, orderBy: { startedAt: "desc" } });
+    return current ?? this.db.rundownExecutionSession.create({ data: { rundownId, productionId, mode, status: "active" } });
+  }
+
+  private view(cue: PersistedCue, execution?: { status: string; executionId: string; error: string | null }): CueView {
+    const status: CueStatus = execution?.status === "dispatched" ? "complete" : execution?.status === "accepted" ? "active" : "pending";
+    return { id: cue.id, label: cue.label, order: cue.position, command: cue.commandPayload as PresentationCommandPayload, enabled: cue.enabled, status, ...(execution ? { executionId: execution.executionId } : {}), ...(execution?.error ? { error: execution.error } : {}) };
+  }
+}
