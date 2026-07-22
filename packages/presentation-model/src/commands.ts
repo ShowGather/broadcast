@@ -6,7 +6,8 @@ export type PresentationCommandPayload =
   | { k: "alert"; t: string; m: string; x?: "i" | "w" | "c"; d?: number }
   | { k: "sponsor"; b: string; s?: string; d?: number }
   | { k: "ticker"; t: string; l?: string }
-  | { k: "clear"; g?: "v" | "h" | "l" | "r" | "f"; y?: string };
+  | { k: "clear"; g?: "v" | "h" | "l" | "r" | "f"; y?: string }
+  | { k: "noop" };
 
 export interface PresentationCommandInput { id: string; p: PresentationCommandPayload; }
 
@@ -19,6 +20,7 @@ export function resolvePresentationCommand(event: PresentationCommandInput, targ
     case "sponsor": return [{ action: "activate", eventId: `${event.id}:sponsor`, targetPts, region: "right.rail", layer: "primary", priority: p.d === undefined ? 10 : 100, ...(p.d !== undefined ? { durationMs: p.d } : {}), item: { kind: "sponsor-panel", brand: p.b, tagline: p.s } }];
     case "ticker": return [{ action: "activate", eventId: `${event.id}:ticker`, targetPts, region: "footer", layer: "ticker", priority: 10, item: { kind: "ticker", text: p.t, label: p.l } }];
     case "clear": return [{ action: "clear", eventId: event.id, targetPts, ...(p.g !== undefined ? { region: regionFromCode(p.g) } : {}), ...(p.y !== undefined ? { layer: p.y } : {}) }];
+    case "noop": return [];
   }
 }
 

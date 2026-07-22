@@ -13,8 +13,8 @@ interface CueView { id: string; label: string; order: number; command: Presentat
 export class PersistentRundown {
   constructor(private readonly db: PrismaClient) {}
 
-  async snapshot(target: RundownTarget) {
-    const rundown = await this.db.rundown.findUniqueOrThrow({ where: { id: DEFAULT_RUNDOWN_ID }, include: { cues: { orderBy: { position: "asc" } }, production: true } });
+  async snapshot(target: RundownTarget, rundownId = DEFAULT_RUNDOWN_ID) {
+    const rundown = await this.db.rundown.findUniqueOrThrow({ where: { id: rundownId }, include: { cues: { orderBy: { position: "asc" } }, production: true } });
     const session = await this.db.rundownExecutionSession.findFirst({ where: { rundownId: rundown.id, mode: target, status: "active" }, orderBy: { startedAt: "desc" }, include: { cues: true } });
     const executions = new Map(session?.cues.map((execution) => [execution.rundownCueId, execution]) ?? []);
     return {
@@ -25,14 +25,14 @@ export class PersistentRundown {
     };
   }
 
-  async go(target: RundownTarget, cueId: string, rerun = false) {
-    const rundown = await this.db.rundown.findUniqueOrThrow({ where: { id: DEFAULT_RUNDOWN_ID }, include: { cues: true } });
+  async go(target: RundownTarget, cueId: string, rerun = false, rundownId = DEFAULT_RUNDOWN_ID) {
+    const rundown = await this.db.rundown.findUniqueOrThrow({ where: { id: rundownId }, include: { cues: true } });
     const cue = rundown.cues.find((candidate) => candidate.id === cueId);
     if (!cue || !cue.enabled) throw new Error("cue not found or disabled");
     const session = await this.session(rundown.id, rundown.productionId, target);
     const previous = await this.db.rundownCueExecution.findFirst({ where: { sessionId: session.id, rundownCueId: cue.id }, orderBy: { createdAt: "desc" } });
-    if (previous?.status === "dispatched" && !rerun) return { ...(await this.snapshot(target)), eventId: previous.executionId, duplicate: true };
-    if (previous?.status === "accepted" && !rerun) return { ...(await this.snapshot(target)), eventId: previous.executionId, duplicate: true };
+    if (previous?.status === "dispatched" && !rerun) return { ...(await this.snapshot(target, rundownId)), eventId: previous.executionId, duplicate: true };
+    if (previous?.status === "accepted" && !rerun) return { ...(await this.snapshot(target, rundownId)), eventId: previous.executionId, duplicate: true };
 
     const executionId = rerun || !previous ? `run-${target}-${cue.id}-${rerun ? Date.now() : "initial"}` : previous.executionId;
     const created = createEvent({ command: cue.commandPayload as PresentationCommandPayload });
@@ -47,7 +47,7 @@ export class PersistentRundown {
     if (target === "rehearsal") {
       const result = dispatchRehearsalEvent(event);
       await this.db.rundownCueExecution.update({ where: { id: execution.id }, data: { status: "dispatched", executedAt: new Date() } });
-      return { ...(await this.snapshot(target)), event: result.event };
+      return { ...(await this.snapshot(target, rundownId)), event: result.event };
     }
 
     const result = await dispatchLiveEvent(event, "rundown", executionId);
@@ -56,7 +56,7 @@ export class PersistentRundown {
     } else if (result.status === "failed") {
       await this.db.rundownCueExecution.update({ where: { id: execution.id }, data: { status: "failed", error: String((result.injectionResponse as { error?: string }).error ?? "dispatch failed") } });
     }
-    return { ...(await this.snapshot(target)), event: result.event, dispatchStatus: result.status };
+    return { ...(await this.snapshot(target, rundownId)), event: result.event, dispatchStatus: result.status };
   }
 
   private async session(rundownId: string, productionId: string, mode: RundownTarget) {

@@ -23,20 +23,20 @@ function state(target: Target, cueId: string): CueState { return states[target].
 function snapshot(target: Target) { return { target, cues: cues.map((cue, index) => ({ ...cue, order: index + 1, ...state(target, cue.id) })) }; }
 
 export async function rundownRoutes(app: FastifyInstance) {
-  app.get<{ Params: { target: Target } }>("/rundown/:target", async (request, reply) => {
+  app.get<{ Params: { target: Target }; Querystring: { rundownId?: string } }>("/rundown/:target", async (request, reply) => {
     if (request.params.target !== "live" && request.params.target !== "rehearsal") return reply.status(400).send({ error: "target must be live or rehearsal" });
-    if (persistentRundown) return persistentRundown.snapshot(request.params.target);
+    if (persistentRundown) return persistentRundown.snapshot(request.params.target, request.query.rundownId);
     return snapshot(request.params.target);
   });
-  app.post<{ Params: { target: Target }; Body: { cueId?: string; rerun?: boolean } }>("/rundown/:target/go", async (request, reply) => {
+  app.post<{ Params: { target: Target }; Querystring: { rundownId?: string }; Body: { cueId?: string; rerun?: boolean } }>("/rundown/:target/go", async (request, reply) => {
     const target = request.params.target;
     if (target !== "live" && target !== "rehearsal") return reply.status(400).send({ error: "target must be live or rehearsal" });
     if (persistentRundown) {
       try {
-        const result = await persistentRundown.go(target, request.body?.cueId ?? "", request.body?.rerun);
+        const result = await persistentRundown.go(target, request.body?.cueId ?? "", request.body?.rerun, request.query.rundownId);
         const dispatchStatus = "dispatchStatus" in result ? result.dispatchStatus : undefined;
         if (target === "live" && dispatchStatus === "failed") return reply.status(503).send(result);
-        return reply.status(target === "live" && dispatchStatus === "accepted" ? 202 : 201).send(result);
+        return reply.status(target === "live" && dispatchStatus === "pending" ? 202 : 201).send(result);
       } catch (error) {
         return reply.status(404).send({ error: error instanceof Error ? error.message : "unable to execute cue" });
       }

@@ -63,7 +63,9 @@ export type PresentationCommandPayload =
   | { k: "alert"; t: string; m: string; x?: "i" | "w" | "c"; d?: number }
   | { k: "sponsor"; b: string; s?: string; d?: number }
   | { k: "ticker"; t: string; l?: string }
-  | { k: "clear"; g?: "v" | "h" | "l" | "r" | "f"; y?: string };
+  | { k: "clear"; g?: "v" | "h" | "l" | "r" | "f"; y?: string }
+  /** Ordered cancellation resolution: advances a durable revision without changing presentation. */
+  | { k: "noop" };
 
 export interface PresentationCommandEvent {
   v: 1;
@@ -166,6 +168,8 @@ export function validatePresentationCommandPayload(data: unknown): PresentationC
     case "clear":
       return (p.g === undefined || p.g === "v" || p.g === "h" || p.g === "l" || p.g === "r" || p.g === "f") && optionalText(p.y, 16)
         ? { k: "clear", ...(p.g !== undefined ? { g: p.g } : {}), ...(typeof p.y === "string" ? { y: p.y } : {}) } : null;
+    case "noop":
+      return Object.keys(p).length === 1 ? { k: "noop" } : null;
     default:
       return null;
   }

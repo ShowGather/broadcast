@@ -30,7 +30,7 @@ export interface StoredEvent {
   event: ShowGatherEvent;
   injectedAt: string;
   injectionResponse: unknown;
-  status?: "accepted" | "dispatched" | "failed";
+  status?: "pending" | "dispatched" | "failed" | "cancelled";
   revision?: number;
 }
 
@@ -40,7 +40,7 @@ const channelPresentation = new ChannelPresentationState();
 let dispatchTail: Promise<void> = Promise.resolve();
 const persistentStore = process.env.DATABASE_URL ? new PersistentPresentationStore(prisma, injectLiveEvent) : null;
 
-async function injectLiveEvent(event: ShowGatherEvent): Promise<unknown> {
+export async function injectLiveEvent(event: ShowGatherEvent): Promise<unknown> {
   const id3Base64 = Buffer.from(encodeTpe1Frame(encodeEvent(event))).toString("base64");
   const response = await fetch(INJECTOR_URL, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ id3_base64: id3Base64 }) });
   const body = await response.json().catch(() => null);

@@ -5,6 +5,10 @@ interface StoredEvent {
   injectedAt: string;
 }
 interface RundownCue { id: string; label: string; order: number; status: "pending" | "active" | "complete"; executionId?: string; }
+interface Channel { id: string; name: string; slug: string; status: string; }
+interface Production { id: string; title: string; status: string; }
+interface Rundown { id: string; name: string; version: number; }
+interface OutboxItem { id: string; eventId: string; revision: number; label: string; status: "pending" | "dispatched" | "failed" | "cancelled"; error?: string; retryable: boolean; cancellable: boolean; }
 
 function eventLabel(event: StoredEvent["event"]) {
   if (event.t === "presentation.cue") return `Cue: ${event.p.cue ?? "unknown"}`;
@@ -28,6 +32,41 @@ export default function App() {
   const [commandDuration, setCommandDuration] = useState(8000);
   const [rundown, setRundown] = useState<RundownCue[]>([]);
   const [apiConnection, setApiConnection] = useState<"checking" | "connected" | "offline">("checking");
+  const [channels, setChannels] = useState<Channel[]>([]);
+  const [productions, setProductions] = useState<Production[]>([]);
+  const [rundowns, setRundowns] = useState<Rundown[]>([]);
+  const [channelId, setChannelId] = useState(() => localStorage.getItem("showgather.channelId") ?? "");
+  const [productionId, setProductionId] = useState(() => localStorage.getItem("showgather.productionId") ?? "");
+  const [rundownId, setRundownId] = useState(() => localStorage.getItem("showgather.rundownId") ?? "");
+  const [outbox, setOutbox] = useState<OutboxItem[]>([]);
+  const [selectionError, setSelectionError] = useState("");
+
+  useEffect(() => {
+    fetch("/api/channels").then(async (response) => {
+      if (!response.ok) throw new Error("Unable to load channels");
+      const items = await response.json() as Channel[]; setChannels(items);
+      setChannelId((current) => items.some((item) => item.id === current) ? current : items[0]?.id ?? "");
+    }).catch((reason) => setSelectionError(reason instanceof Error ? reason.message : "Unable to load channels"));
+  }, []);
+  useEffect(() => { if (channelId) localStorage.setItem("showgather.channelId", channelId); }, [channelId]);
+  useEffect(() => { if (productionId) localStorage.setItem("showgather.productionId", productionId); }, [productionId]);
+  useEffect(() => { if (rundownId) localStorage.setItem("showgather.rundownId", rundownId); }, [rundownId]);
+  useEffect(() => {
+    if (!channelId) return;
+    fetch(`/api/channels/${channelId}/productions`).then(async (response) => {
+      if (!response.ok) throw new Error("Unable to load productions");
+      const items = await response.json() as Production[]; setProductions(items);
+      setProductionId((current) => items.some((item) => item.id === current) ? current : items[0]?.id ?? "");
+    }).catch((reason) => setSelectionError(reason instanceof Error ? reason.message : "Unable to load productions"));
+  }, [channelId]);
+  useEffect(() => {
+    if (!productionId) return;
+    fetch(`/api/productions/${productionId}/rundowns`).then(async (response) => {
+      if (!response.ok) throw new Error("Unable to load rundowns");
+      const items = await response.json() as Rundown[]; setRundowns(items);
+      setRundownId((current) => items.some((item) => item.id === current) ? current : items[0]?.id ?? "");
+    }).catch((reason) => setSelectionError(reason instanceof Error ? reason.message : "Unable to load rundowns"));
+  }, [productionId]);
 
   const fetchEvents = useCallback(async () => {
     try {
@@ -43,10 +82,18 @@ export default function App() {
   }, [fetchEvents]);
 
   const fetchRundown = useCallback(async () => {
-    const response = await fetch(`/api/rundown/${rehearsal ? "rehearsal" : "live"}`);
+    if (!rundownId) return;
+    const response = await fetch(`/api/rundown/${rehearsal ? "rehearsal" : "live"}?rundownId=${encodeURIComponent(rundownId)}`);
     if (response.ok) setRundown((await response.json()).cues);
-  }, [rehearsal]);
+  }, [rehearsal, rundownId]);
   useEffect(() => { fetchRundown().catch(() => {}); }, [fetchRundown]);
+
+  const fetchOutbox = useCallback(async () => {
+    if (!channelId) return;
+    const response = await fetch(`/api/channels/${channelId}/presentation/outbox`);
+    if (response.ok) setOutbox(await response.json());
+  }, [channelId]);
+  useEffect(() => { fetchOutbox().catch(() => {}); const interval = window.setInterval(() => { fetchOutbox().catch(() => {}); }, 5_000); return () => window.clearInterval(interval); }, [fetchOutbox]);
 
   useEffect(() => {
     let active = true;
@@ -64,8 +111,9 @@ export default function App() {
       const response = await fetch(rehearsal ? "/api/rehearsal/events" : "/api/events", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
       if (!response.ok) throw new Error(await response.text());
       const result = await response.json();
-      setStatus(`${rehearsal ? "Rehearsal: " : "Live: "}${success} — ${result.event?.id ?? "queued"}`);
+      setStatus(`${rehearsal ? "Rehearsal: " : "Live: "}${success} — ${result.event?.id ?? "queued"} (${result.status ?? "pending"})`);
       if (!rehearsal) fetchEvents();
+      if (!rehearsal) fetchOutbox();
     } catch (reason) {
       setError(reason instanceof Error ? reason.message : "Unable to send event");
     }
@@ -85,16 +133,36 @@ export default function App() {
   const goCue = async (cue: RundownCue, rerun = false) => {
     setStatus(""); setError("");
     try {
-      const response = await fetch(`/api/rundown/${rehearsal ? "rehearsal" : "live"}/go`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ cueId: cue.id, ...(rerun ? { rerun: true } : {}) }) });
+      const response = await fetch(`/api/rundown/${rehearsal ? "rehearsal" : "live"}/go?rundownId=${encodeURIComponent(rundownId)}`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ cueId: cue.id, ...(rerun ? { rerun: true } : {}) }) });
       if (!response.ok) throw new Error(await response.text());
-      const result = await response.json(); setRundown(result.cues); setStatus(`${rehearsal ? "Rehearsal" : "Live"} rundown: ${cue.label} complete`); if (!rehearsal) fetchEvents();
+      const result = await response.json(); setRundown(result.cues); setStatus(`${rehearsal ? "Rehearsal" : "Live"} rundown: ${cue.label} ${result.dispatchStatus ?? "complete"}`); if (!rehearsal) { fetchEvents(); fetchOutbox(); }
     } catch (reason) { setError(reason instanceof Error ? reason.message : "Unable to execute cue"); }
+  };
+
+  const resolveOutbox = async (item: OutboxItem, action: "retry" | "cancel") => {
+    setError(""); setStatus("");
+    try {
+      const response = await fetch(`/api/channels/${channelId}/presentation/outbox/${item.id}/${action}`, { method: "POST" });
+      if (!response.ok) throw new Error(await response.text());
+      const result = await response.json();
+      setStatus(`${item.label} revision ${item.revision}: ${result.status}`); await fetchOutbox(); await fetchRundown();
+    } catch (reason) { setError(reason instanceof Error ? reason.message : `Unable to ${action} command`); }
   };
 
   return <div className="container">
     <header className="header"><h1>ShowGather Broadcast — Control</h1><p>{rehearsal ? "Rehearsal cues go only to opted-in preview players." : "Live controls send compact, timed metadata to the HLS pipeline."}</p><p className={`connection connection--${apiConnection}`}>API {apiConnection}</p>
       <button className={`mode-toggle ${rehearsal ? "rehearsal" : ""}`} onClick={() => setRehearsal((current) => !current)}>{rehearsal ? "🟡 Rehearsal mode" : "🔴 Live mode"}</button>
     </header>
+
+    <section className="section">
+      <h2>Show context</h2>
+      <div className="form">
+        <label><span>Channel</span><select value={channelId} onChange={(event) => setChannelId(event.target.value)}>{channels.map((channel) => <option key={channel.id} value={channel.id}>{channel.name}</option>)}</select></label>
+        <label><span>Production</span><select value={productionId} onChange={(event) => setProductionId(event.target.value)}>{productions.map((production) => <option key={production.id} value={production.id}>{production.title}</option>)}</select></label>
+        <label><span>Rundown</span><select value={rundownId} onChange={(event) => setRundownId(event.target.value)}>{rundowns.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}</select></label>
+      </div>
+      {selectionError && <p className="error-msg">{selectionError}</p>}
+    </section>
 
     <section className="section quick-cues">
       <h2>On-air cues</h2>
@@ -144,6 +212,11 @@ export default function App() {
     <section className="section"><h2>Recent on-air events</h2>
       {events.length === 0 ? <p className="empty">No events yet.</p> : <table className="events-table"><thead><tr><th>Event</th><th>Type</th><th>Time</th></tr></thead><tbody>
         {events.map((stored) => <tr key={stored.event.id}><td>{eventLabel(stored.event)}</td><td className="mono">{stored.event.t}</td><td className="mono">{new Date(stored.injectedAt).toLocaleTimeString()}</td></tr>)}
+      </tbody></table>}
+    </section>
+    <section className="section"><h2>Live dispatch status</h2>
+      {outbox.length === 0 ? <p className="empty">No durable commands have been submitted.</p> : <table className="events-table"><thead><tr><th>Command</th><th>Revision</th><th>Status</th><th>Action</th></tr></thead><tbody>
+        {outbox.map((item) => <tr key={item.id}><td>{item.label}<br /><span className="hint mono">{item.eventId}</span>{item.error && <p className="error-msg">{item.error}</p>}</td><td>{item.revision}</td><td>{item.status}</td><td>{item.retryable && <button onClick={() => resolveOutbox(item, "retry")}>Retry</button>}{item.cancellable && <button className="safe-clear" onClick={() => resolveOutbox(item, "cancel")}>Cancel</button>}</td></tr>)}
       </tbody></table>}
     </section>
   </div>;

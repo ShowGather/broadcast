@@ -3,7 +3,7 @@ import type { ShowGatherEvent } from "@showgather/event-schema";
 import type { PresentationSnapshot } from "@showgather/presentation-model";
 import { applyPersistentEvent, eventChangesPersistentState } from "./channelState.js";
 
-export type DispatchStatus = "accepted" | "dispatched" | "failed";
+export type DispatchStatus = "pending" | "dispatched" | "failed" | "cancelled";
 export interface AcceptedPresentationCommand {
   event: ShowGatherEvent;
   channelId: string;
@@ -30,7 +30,7 @@ export class PersistentPresentationStore {
   async accept(event: ShowGatherEvent, source = "direct-control", executionId?: string, channelSlug = DEFAULT_CHANNEL_SLUG): Promise<AcceptedPresentationCommand> {
     const channel = await this.channel(channelSlug);
     const existing = await this.db.presentationCommand.findUnique({ where: { eventId: event.id } });
-    if (existing) return { event: existing.event as unknown as ShowGatherEvent, channelId: channel.id, revision: existing.revision ?? undefined, status: existing.status as DispatchStatus, ...(existing.dispatchError ? { error: existing.dispatchError } : {}) };
+    if (existing) return this.commandResult(existing, channel.id);
 
     if (!eventChangesPersistentState(event, 1)) {
       await this.inject(event);
@@ -58,16 +58,54 @@ export class PersistentPresentationStore {
 
     await this.dispatch(channel.id);
     const command = await this.db.presentationCommand.findUniqueOrThrow({ where: { id: accepted.id } });
-    return { event: command.event as unknown as ShowGatherEvent, channelId: channel.id, revision: command.revision ?? undefined, status: command.status as DispatchStatus, ...(command.dispatchError ? { error: command.dispatchError } : {}) };
+    return this.commandResult(command, channel.id);
+  }
+
+  async outbox(channelId: string, status?: string) {
+    const rows = await this.db.presentationOutbox.findMany({
+      where: { channelId, ...(status ? { status: status === "pending" ? "pending" : status } : {}) },
+      include: { command: true }, orderBy: { revision: "asc" },
+    });
+    return rows.map((row) => ({
+      id: row.id, eventId: row.command.eventId, revision: row.revision,
+      label: labelForEvent(row.command.event as unknown as ShowGatherEvent),
+      status: externalStatus(row.status), attempts: row.attempts,
+      ...(row.lastError ? { error: row.lastError } : {}),
+      retryable: row.status === "failed", cancellable: row.status === "failed",
+      createdAt: row.createdAt, dispatchedAt: row.dispatchedAt,
+    }));
+  }
+
+  async retry(channelId: string, outboxId: string): Promise<AcceptedPresentationCommand> {
+    const outbox = await this.db.presentationOutbox.findFirstOrThrow({ where: { id: outboxId, channelId }, include: { command: true } });
+    if (outbox.status !== "failed") throw new Error("only failed commands can be retried");
+    await this.db.$transaction([
+      this.db.presentationOutbox.update({ where: { id: outbox.id }, data: { status: "pending", lastError: null } }),
+      this.db.presentationCommand.update({ where: { id: outbox.commandId }, data: { status: "accepted", dispatchError: null } }),
+    ]);
+    await this.dispatch(channelId);
+    return this.commandResult(await this.db.presentationCommand.findUniqueOrThrow({ where: { id: outbox.commandId } }), channelId);
+  }
+
+  async cancel(channelId: string, outboxId: string): Promise<AcceptedPresentationCommand> {
+    const outbox = await this.db.presentationOutbox.findFirstOrThrow({ where: { id: outboxId, channelId }, include: { command: true } });
+    if (outbox.status !== "failed") throw new Error("only failed commands can be cancelled");
+    const cancellation: ShowGatherEvent = { v: 1, id: `cancel-${outbox.id}`, r: outbox.revision, t: "pc", p: { k: "noop" } };
+    await this.db.$transaction([
+      this.db.presentationOutbox.update({ where: { id: outbox.id }, data: { status: "cancelling", event: cancellation as unknown as Prisma.InputJsonValue, lastError: null } }),
+      this.db.presentationCommand.update({ where: { id: outbox.commandId }, data: { status: "cancelling", dispatchError: null } }),
+    ]);
+    await this.dispatch(channelId);
+    return this.commandResult(await this.db.presentationCommand.findUniqueOrThrow({ where: { id: outbox.commandId } }), channelId);
   }
 
   /** Serialises one API process and refuses to skip an unresolved durable revision. */
   private async dispatch(channelId: string): Promise<void> {
     const operation = this.dispatchTail.then(async () => {
-      const next = await this.db.presentationOutbox.findFirst({ where: { channelId, status: { in: ["pending", "dispatching", "failed"] } }, orderBy: { revision: "asc" }, include: { command: true } });
-      if (!next || next.status === "failed") return;
-      if (next.status === "dispatching") return;
-      const claimed = await this.db.presentationOutbox.updateMany({ where: { id: next.id, status: "pending" }, data: { status: "dispatching", attempts: { increment: 1 }, lastError: null } });
+      for (;;) {
+      const next = await this.db.presentationOutbox.findFirst({ where: { channelId, status: { in: ["pending", "cancelling", "dispatching", "failed"] } }, orderBy: { revision: "asc" }, include: { command: true } });
+      if (!next || next.status === "failed" || next.status === "dispatching") return;
+      const claimed = await this.db.presentationOutbox.updateMany({ where: { id: next.id, status: next.status }, data: { status: "dispatching", attempts: { increment: 1 }, lastError: null } });
       if (claimed.count === 0) return;
       try {
         await this.inject(next.event as unknown as ShowGatherEvent);
@@ -81,6 +119,7 @@ export class PersistentPresentationStore {
       }
 
       await this.finalise(next.id);
+      }
     });
     this.dispatchTail = operation.then(() => undefined, () => undefined);
     return operation;
@@ -97,12 +136,26 @@ export class PersistentPresentationStore {
       const publishedAt = new Date();
       await tx.presentationSnapshot.update({ where: { id: snapshot.id }, data: { revision: outbox.revision, state: state as unknown as Prisma.InputJsonValue } });
       await tx.channel.update({ where: { id: outbox.channelId }, data: { publishedRevision: outbox.revision } });
-      await tx.presentationOutbox.update({ where: { id: outbox.id }, data: { status: "dispatched", injectorAcceptedAt: publishedAt, dispatchedAt: publishedAt } });
-      await tx.presentationCommand.update({ where: { id: outbox.commandId }, data: { status: "dispatched", dispatchedAt: publishedAt, dispatchError: null } });
+      const cancelled = event.t === "pc" && event.p.k === "noop";
+      await tx.presentationOutbox.update({ where: { id: outbox.id }, data: { status: cancelled ? "cancelled" : "dispatched", injectorAcceptedAt: publishedAt, dispatchedAt: publishedAt } });
+      await tx.presentationCommand.update({ where: { id: outbox.commandId }, data: { status: cancelled ? "cancelled" : "dispatched", dispatchedAt: publishedAt, dispatchError: null } });
     });
   }
 
   private async channel(slug = DEFAULT_CHANNEL_SLUG) {
     return this.db.channel.findUniqueOrThrow({ where: { slug } });
   }
+
+  private commandResult(command: { event: unknown; revision: number | null; status: string; dispatchError: string | null }, channelId: string): AcceptedPresentationCommand {
+    return { event: command.event as ShowGatherEvent, channelId, revision: command.revision ?? undefined, status: externalStatus(command.status), ...(command.dispatchError ? { error: command.dispatchError } : {}) };
+  }
+}
+
+function externalStatus(status: string): DispatchStatus {
+  return status === "dispatched" || status === "failed" || status === "cancelled" ? status : "pending";
+}
+
+function labelForEvent(event: ShowGatherEvent): string {
+  if (event.t === "pc") return event.p.k === "noop" ? "Cancellation resolution" : `${event.p.k} command`;
+  return event.t;
 }
