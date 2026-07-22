@@ -59,16 +59,22 @@ Failed commands do not change the published snapshot and block later durable
 revisions for that channel. Retries retain the same event ID and revision.
 This protects the Player's duplicate suppression and revision-gap recovery.
 
+An operator can also cancel a failed command. The API sends a stable compact
+`noop` cancellation event at that same revision, advances the published snapshot
+revision without changing presentation state, and releases the following queued
+revision. Cancellation is retained in command/outbox history; failed commands
+are never silently deleted.
+
 If injector acceptance succeeds but finalisation cannot be recorded, the same
 event ID/revision is retained for idempotent recovery; no new revision is
 allocated.
 
 ## Current limitations
 
-- The first dispatcher is API-process-local; a later production increment
-  should add robust cross-process claiming and an explicit operator retry or
-  cancellation control.
-- Admin currently loads the seeded default production/rundown rather than a
-  production selector.
+- The V1 dispatcher assumes one active API dispatcher process per database. A
+  production deployment needs row-level outbox claiming/leases, likely using
+  `SELECT ... FOR UPDATE SKIP LOCKED`.
+- Admin has focused channel, production, and rundown selectors; it does not yet
+  provide organisation management or broad CRUD editing.
 - Rehearsal execution records persist, but rehearsal commands remain SSE-only
   and never write live snapshots or live outbox rows.

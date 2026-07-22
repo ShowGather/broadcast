@@ -108,6 +108,8 @@ CI reproduces builds, TypeScript tests, and TS-segmenter Go tests. Browser/HLS t
 
 - PostgreSQL persistence is local-pilot infrastructure; no production backup,
   high-availability, or multi-operator deployment has been implemented.
+- The ordered database outbox assumes one active API dispatcher process per
+  database; multi-instance claiming is a later production increment.
 - No accounts, authentication, roles, or multi-operator collaboration.
 - No asset/template library or general plugin system.
 - Compose is local demonstration infrastructure, not production packaging, CDN delivery, or observability.

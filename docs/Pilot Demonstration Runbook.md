@@ -78,6 +78,10 @@ Switch Admin to rehearsal mode and use the same rundown. Only the viewer opened 
   revision is returned from the snapshot endpoint.
 - [ ] A failed injector dispatch is shown as failed/pending and does not mark a
   rundown cue complete or update the late-join snapshot.
+- [ ] A failed command can be retried with the same event ID/revision; after
+  success, later queued revisions dispatch in order.
+- [ ] A failed command can be cancelled; its no-op resolution advances the
+  revision without changing presentation state and releases later revisions.
 
 ## Pilot labelling
 

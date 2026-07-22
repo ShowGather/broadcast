@@ -48,6 +48,20 @@ successfully dispatched and applied to the snapshot.
 This difference is intentional. A failed revision blocks later durable revisions
 until it is retried or deliberately resolved, avoiding revision gaps in viewers.
 
+## Recovery and dispatch ownership
+
+A failed outbox record can be retried with its original event ID and revision.
+It can also be cancelled deliberately. Cancellation publishes a compact `noop`
+event using the failed revision; the Player advances its revision gate but the
+presentation reducer makes no state change. The next queued durable revision can
+then dispatch without creating a gap.
+
+V1 assumes **one active API dispatcher process per database**. The in-process
+queue provides deterministic ordering for this local pilot, but is not a
+multi-instance claim mechanism. A production increment should use row claiming
+such as `SELECT ... FOR UPDATE SKIP LOCKED` plus a lease/heartbeat before
+dispatching an outbox record.
+
 ## Persistence model
 
 The initial schema includes Organisation, Channel, Production, Rundown,
