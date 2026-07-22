@@ -7,7 +7,7 @@ interface StoredEvent {
 }
 interface RundownCue { id: string; label: string; order: number; enabled: boolean; status: "pending" | "active" | "complete" | "failed" | "cancelled"; executionId?: string; }
 interface Channel { id: string; name: string; slug: string; status: string; }
-interface Production { id: string; title: string; description?: string | null; status: string; scheduledStart?: string | null; scheduledEnd?: string | null; configuration?: Record<string, unknown> | null; showConfigurationId?: string | null; }
+interface Production { id: string; channelId: string; title: string; description?: string | null; status: string; scheduledStart?: string | null; scheduledEnd?: string | null; configuration?: Record<string, unknown> | null; showConfigurationId?: string | null; }
 interface Rundown { id: string; name: string; version: number; }
 interface RundownDefinitionCue { id: string; label: string; position: number; enabled: boolean; commandPayload: Record<string, unknown>; }
 interface ShowConfiguration { id: string; name: string; configuration: Record<string, unknown>; }
@@ -347,9 +347,13 @@ export default function App() {
       {selectionError && <p className="error-msg" role="alert">{selectionError}</p>}
     </section>
 
-    {route.workspace === "productions" && <section className="section">
-      <h2>Start a production</h2><p className="hint">Choose an existing production above, or create a saved production to begin preparing a new show.</p>
-      <button onClick={() => createProduction(true)} disabled={!channelId}>Create a new production</button>
+    {route.workspace === "productions" && <section className="section productions-home">
+      <div className="workspace-heading"><div><h2>Productions</h2><p className="hint">Open a saved production to prepare, rehearse, or run it. Technical delivery details remain outside this starting view.</p></div><button onClick={() => createProduction(true)} disabled={!channelId}>New production</button></div>
+      {productions.length === 0 ? <div className="productions-empty"><h3>You have not created a production yet.</h3><p>A production contains your programme details, viewer presentation, rundown, and live controls.</p><button onClick={() => createProduction(true)} disabled={!channelId}>Create your first production</button></div>
+        : <div className="production-cards">{productions.map((production) => {
+          const productionRundowns = production.id === productionId ? rundowns : [];
+          return <article key={production.id} className="production-card"><div><span className={`production-card__status production-card__status--${production.status}`}>{production.status}</span><h3>{production.title}</h3><p>{channels.find((channel) => channel.id === production.channelId)?.name ?? "Selected channel"}{production.scheduledStart ? ` · ${new Date(production.scheduledStart).toLocaleString()}` : " · No schedule"}</p><p className="hint">{productionRundowns.length ? `${productionRundowns.length} rundown${productionRundowns.length === 1 ? "" : "s"}` : "No rundown created"} · {production.configuration ? "Show configuration selected" : "No show configuration"}</p></div><div className="production-card__actions"><button onClick={() => { setProductionId(production.id); navigate({ workspace: "prepare", productionId: production.id, prepareTab: "overview" }); }}>{productionRundowns.length ? "Open" : "Continue setup"}</button><button onClick={async () => { const result = await mutate(`/api/productions/${production.id}/duplicate`, "POST", {}, "Production duplicated"); if (result?.id) { setProductions(await (await fetch(`/api/channels/${channelId}/productions`)).json() as Production[]); } }}>Duplicate</button></div></article>;
+        })}</div>}
     </section>}
 
     {workspace === "prepare" && <><section className="section" hidden={prepareTab !== "rundown"}>
