@@ -107,6 +107,8 @@ export default function App() {
   const [transitionKind, setTransitionKind] = useState<"cut" | "fade" | "slide" | "scale">("fade");
   const [transitionDuration, setTransitionDuration] = useState(180);
   const [selectedElement, setSelectedElement] = useState("scorebug");
+  const [elementsOpen, setElementsOpen] = useState(true);
+  const [deckPinned, setDeckPinned] = useState(false);
   const [configurations, setConfigurations] = useState<ShowConfiguration[]>([]);
   const workspace = route.workspace === "productions" ? "prepare" : route.workspace;
   const prepareTab = route.prepareTab ?? "overview";
@@ -414,12 +416,11 @@ export default function App() {
         })}</div>}
     </section>}
 
-    {workspace === "prepare" && <><section className="section" hidden={prepareTab !== "rundown"}>
-      <h2>Elements</h2>
-      <p className="hint">Choose a presentation source to target its stable instance, suggested command, and placement preset. Elements are constrained to recognised component types and named placements.</p>
-      <div className="element-library" role="list" aria-label="Presentation elements">
+    {workspace === "prepare" && <><section className={`section elements-panel${elementsOpen ? "" : " elements-panel--collapsed"}`} hidden={prepareTab !== "rundown"}>
+      <div className="workspace-heading"><div><h2>Elements</h2><p className="hint">Choose a presentation source to target its stable instance, suggested command, and placement preset.</p></div><button type="button" className="elements-panel__toggle" aria-expanded={elementsOpen} onClick={() => setElementsOpen((open) => !open)}>{elementsOpen ? "Collapse" : "Open elements"}</button></div>
+      {elementsOpen && <div className="element-library" role="list" aria-label="Presentation elements">
         {(["scorebug", "lower-third", "ticker", "alert", "sponsor-panel", "clock"] as const).map((kind) => <button key={kind} type="button" role="listitem" className={selectedElement === kind ? "active" : ""} onClick={() => chooseElement(kind)}>{kind === "sponsor-panel" ? "Sponsor bug" : kind.replace("-", " ")}</button>)}
-      </div>
+      </div>}
     </section><section className="section">
       <div hidden={prepareTab !== "overview"} className="prepare-overview">
       <div>
@@ -537,8 +538,8 @@ export default function App() {
       </div>
     </section>}
 
-    {workspace !== "run" && <section className="section" hidden={workspace === "prepare" && prepareTab !== "rundown"}>
-      <h2>Configurable presentation command</h2>
+    {workspace !== "run" && <section className="section control-surface" hidden={workspace === "prepare" && prepareTab !== "rundown"}>
+      <div className="workspace-heading"><div><h2>Control Surface</h2><p className="hint">Typed controls follow the selected presentation element, or can remain pinned while you work elsewhere.</p></div><div className="control-surface__mode" role="group" aria-label="Control Surface mode"><button type="button" className={!deckPinned ? "active" : ""} onClick={() => setDeckPinned(false)}>Follow selected cue</button><button type="button" className={deckPinned ? "active" : ""} onClick={() => setDeckPinned(true)}>Pinned controls</button></div></div>
       <div className="form">
         <label><span>Action</span><select value={commandKind} onChange={(event) => { setCommandKind(event.target.value); setPrimary(""); setSecondary(""); setLabel(""); }}>
           <option value="score">Score update</option><option value="lower">Lower third</option><option value="alert">Alert</option><option value="sponsor">Sponsor takeover</option><option value="ticker">Ticker update</option><option value="clock">Programme clock</option><option value="clear">Regional clear</option>
@@ -550,6 +551,7 @@ export default function App() {
           : <><label><span>{commandKind === "sponsor" ? "Brand" : commandKind === "ticker" ? "Ticker text" : "Title"}</span><input value={primary} maxLength={20} onChange={(event) => setPrimary(event.target.value)} /></label>{commandKind !== "ticker" && <label><span>{commandKind === "alert" ? "Message" : "Subtitle / tagline"}</span><input value={secondary} maxLength={20} onChange={(event) => setSecondary(event.target.value)} /></label>}{commandKind === "ticker" && <label><span>Label</span><input value={label} maxLength={12} onChange={(event) => setLabel(event.target.value)} /></label>}{commandKind !== "ticker" && <label><span>Duration (ms)</span><input type="number" min={1000} step={1000} value={commandDuration} onChange={(event) => setCommandDuration(Number(event.target.value))} /></label>}</>}
         <button onClick={sendCommand}>{rehearsal ? "Trigger rehearsal command" : "Send configurable command"}</button>{workspace === "prepare" && <button disabled={!rundownId} onClick={addCue}>Save as rundown cue</button>}
       </div>
+      {rehearsal && <div className="control-surface__macros" aria-label="Rehearsal macro bank"><span>Macro bank</span><button onClick={() => send({ cue: "goal-home", durationMs: 15_000 }, "Home Goal macro sent")}>Home Goal</button><button onClick={() => send({ cue: "speaker-intro", durationMs: 8_000 }, "Lower Third macro sent")}>Lower Third</button><button onClick={() => send({ cue: "alert-test", durationMs: 8_000 }, "Alert macro sent")}>Alert</button><button className="safe-clear" onClick={() => send({ action: "safe-clear" }, "Safe Clear macro sent")}>Safe Clear</button></div>}
       <p className="hint">Text is byte-bounded for the compact timed-ID3 envelope. Score, ticker, persistent sponsor, and clear update the late-join snapshot.</p>
     </section>}
 
