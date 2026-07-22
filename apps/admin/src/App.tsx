@@ -64,6 +64,10 @@ export default function App() {
   const [liveLabel, setLiveLabel] = useState("LIVE");
   const [accent, setAccent] = useState("#73e3ff");
   const [enabledPanels, setEnabledPanels] = useState(["match", "info", "partners", "interact"]);
+  const [matchPanelLabel, setMatchPanelLabel] = useState("Match");
+  const [infoPanelLabel, setInfoPanelLabel] = useState("Info");
+  const [partnersPanelLabel, setPartnersPanelLabel] = useState("Partners");
+  const [interactPanelLabel, setInteractPanelLabel] = useState("Interact");
   const [configurations, setConfigurations] = useState<ShowConfiguration[]>([]);
   const workspace = route.workspace === "productions" ? "prepare" : route.workspace;
   const rehearsal = workspace === "rehearse";
@@ -325,7 +329,13 @@ export default function App() {
         <label><span>Live label</span><input maxLength={80} value={liveLabel} onChange={(event) => setLiveLabel(event.target.value)} /></label>
         <label><span>Accent</span><input pattern="#[0-9a-fA-F]{6}" value={accent} onChange={(event) => setAccent(event.target.value)} /></label>
         <fieldset className="panel-options"><legend>Mobile companion panels</legend>{(["match", "info", "partners", "interact"] as const).map((panel) => <label key={panel}><input type="checkbox" checked={enabledPanels.includes(panel)} onChange={() => setEnabledPanels((current) => current.includes(panel) ? current.filter((item) => item !== panel) : [...current, panel])} /> {panel}</label>)}</fieldset>
-        <button onClick={() => mutate(`/api/channels/${channelId}/show-configurations`, "POST", { name: configurationName, configuration: { sport: "football", homeTeam, awayTeam, tickerLabel, ...(programmeTitle.trim() ? { programmeTitle: programmeTitle.trim() } : {}), ...(programmeSubtitle.trim() ? { programmeSubtitle: programmeSubtitle.trim() } : {}), ...(liveLabel.trim() ? { liveLabel: liveLabel.trim() } : {}), accent, enabledCompanionPanels: enabledPanels } }, "Show configuration saved", reloadConfigurations)}>Save reusable configuration</button>
+        <fieldset className="panel-options"><legend>Companion tab labels</legend>
+          <label><span>Match</span><input maxLength={30} value={matchPanelLabel} onChange={(event) => setMatchPanelLabel(event.target.value)} /></label>
+          <label><span>Info</span><input maxLength={30} value={infoPanelLabel} onChange={(event) => setInfoPanelLabel(event.target.value)} /></label>
+          <label><span>Partners</span><input maxLength={30} value={partnersPanelLabel} onChange={(event) => setPartnersPanelLabel(event.target.value)} /></label>
+          <label><span>Interact</span><input maxLength={30} value={interactPanelLabel} onChange={(event) => setInteractPanelLabel(event.target.value)} /></label>
+        </fieldset>
+        <button onClick={() => mutate(`/api/channels/${channelId}/show-configurations`, "POST", { name: configurationName, configuration: { sport: "football", homeTeam, awayTeam, tickerLabel, ...(programmeTitle.trim() ? { programmeTitle: programmeTitle.trim() } : {}), ...(programmeSubtitle.trim() ? { programmeSubtitle: programmeSubtitle.trim() } : {}), ...(liveLabel.trim() ? { liveLabel: liveLabel.trim() } : {}), accent, enabledCompanionPanels: enabledPanels, companionPanelLabels: { match: matchPanelLabel.trim() || "Match", info: infoPanelLabel.trim() || "Info", partners: partnersPanelLabel.trim() || "Partners", interact: interactPanelLabel.trim() || "Interact" } } }, "Show configuration saved", reloadConfigurations)}>Save reusable configuration</button>
         <label><span>Copy into production</span><select onChange={(event) => { if (event.target.value) mutate(`/api/productions/${productionId}/copy-configuration`, "POST", { configurationId: event.target.value }, "Configuration copied into production", reloadProduction); }} defaultValue=""><option value="">Choose a saved package</option>{configurations.map((configuration) => <option key={configuration.id} value={configuration.id}>{configuration.name}</option>)}</select></label>
       </div>
       <p className="hint">Packages are copied into a production deliberately. Changing a package never rewrites an existing production.</p>

@@ -103,6 +103,7 @@ function ViewerExperience() {
       </tbody>
     </table>
   </aside>;
+  const connectionNotice = status === "Initializing..." || /error|not supported|offline/i.test(status) ? status : null;
 
   return <div className={`app ${embedded ? "app--embedded" : ""}`} style={{ "--viewer-accent": viewerContext.accent } as CSSProperties}>
     {!embedded && <header className="app-header">
@@ -112,6 +113,7 @@ function ViewerExperience() {
       </div>
     </header>}
     {embedded && <p className="embedded-status" role="status">{viewerContext.liveLabel} · {viewerContext.programmeTitle}{channelId ? ` · channel ${channelId}` : ""}{rehearsal ? " · rehearsal" : ""}</p>}
+    {connectionNotice && <p className="viewer-availability" role="status">{connectionNotice}</p>}
     <ViewerShell profile={profile} video={video} diagnostics={diagnosticsEnabled ? diagnostics : null} enabledPanels={viewerContext.enabledPanels} panelLabels={viewerContext.panelLabels} />
   </div>;
 }
