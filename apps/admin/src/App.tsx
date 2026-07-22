@@ -87,6 +87,7 @@ export default function App() {
   const [selectedElement, setSelectedElement] = useState("scorebug");
   const [configurations, setConfigurations] = useState<ShowConfiguration[]>([]);
   const workspace = route.workspace === "productions" ? "prepare" : route.workspace;
+  const prepareTab = route.prepareTab ?? "overview";
   const rehearsal = workspace === "rehearse";
   const navigate = useCallback((next: AdminRoute, replace = false) => {
     const path = adminPath(next);
@@ -351,21 +352,22 @@ export default function App() {
       <button onClick={() => createProduction(true)} disabled={!channelId}>Create a new production</button>
     </section>}
 
-    {workspace === "prepare" && <><section className="section">
+    {workspace === "prepare" && <><section className="section" hidden={prepareTab !== "rundown"}>
       <h2>Elements</h2>
       <p className="hint">Choose a presentation source to target its stable instance, suggested command, and placement preset. Elements are constrained to recognised component types and named placements.</p>
       <div className="element-library" role="list" aria-label="Presentation elements">
         {(["scorebug", "lower-third", "ticker", "alert", "sponsor-panel", "clock"] as const).map((kind) => <button key={kind} type="button" role="listitem" className={selectedElement === kind ? "active" : ""} onClick={() => chooseElement(kind)}>{kind === "sponsor-panel" ? "Sponsor bug" : kind.replace("-", " ")}</button>)}
       </div>
     </section><section className="section">
+      <div hidden={prepareTab !== "overview"}>
       <h2>Production editor</h2>
       <div className="form">
         <label><span>Title</span><input value={productionTitle} onChange={(event) => setProductionTitle(event.target.value)} /></label>
         <label><span>Description</span><input value={productionDescription} onChange={(event) => setProductionDescription(event.target.value)} /></label>
         <label><span>Status</span><select value={productionStatus} onChange={(event) => setProductionStatus(event.target.value)}><option value="draft">Draft</option><option value="rehearsal">Rehearsal</option><option value="live">Live</option><option value="complete">Complete</option><option value="archived">Archived</option></select></label>
         <button onClick={() => createProduction()}>Create production</button><button disabled={!productionId} onClick={() => mutate(`/api/productions/${productionId}`, "PUT", { title: productionTitle, description: productionDescription, status: productionStatus }, "Production saved", refreshShowContext)}>Save production</button><button disabled={!productionId} onClick={duplicateProduction}>Duplicate production</button>
-      </div>
-      <h3>Reusable show configuration</h3>
+      </div></div>
+      <div hidden={prepareTab !== "configuration"}><h2>Show configuration</h2>
       <div className="form">
         <label><span>Package name</span><input value={configurationName} onChange={(event) => setConfigurationName(event.target.value)} /></label>
         <label><span>Home team</span><input maxLength={20} value={homeTeam} onChange={(event) => setHomeTeam(event.target.value)} /></label>
@@ -394,15 +396,15 @@ export default function App() {
         <button onClick={() => mutate(`/api/channels/${channelId}/show-configurations`, "POST", { name: configurationName, configuration: { sport: "football", homeTeam, awayTeam, tickerLabel, ...(programmeTitle.trim() ? { programmeTitle: programmeTitle.trim() } : {}), ...(programmeSubtitle.trim() ? { programmeSubtitle: programmeSubtitle.trim() } : {}), ...(liveLabel.trim() ? { liveLabel: liveLabel.trim() } : {}), accent, enabledCompanionPanels: enabledPanels, companionPanelLabels: { match: matchPanelLabel.trim() || "Match", info: infoPanelLabel.trim() || "Info", partners: partnersPanelLabel.trim() || "Partners", interact: interactPanelLabel.trim() || "Interact" }, ...(presentationLayouts.length ? { presentationLayouts } : {}) } }, "Show configuration saved", reloadConfigurations)}>Save reusable configuration</button>
         <label><span>Copy into production</span><select onChange={(event) => { if (event.target.value) mutate(`/api/productions/${productionId}/copy-configuration`, "POST", { configurationId: event.target.value }, "Configuration copied into production", reloadProduction); }} defaultValue=""><option value="">Choose a saved package</option>{configurations.map((configuration) => <option key={configuration.id} value={configuration.id}>{configuration.name}</option>)}</select></label>
       </div>
-      <p className="hint">Packages are copied into a production deliberately. Changing a package never rewrites an existing production.</p>
+      <p className="hint">Packages are copied into a production deliberately. Changing a package never rewrites an existing production.</p></div>
     </section>
 
-    <section className="section rehearsal-preview">
+    <section className="section rehearsal-preview" hidden={prepareTab !== "viewer"}>
       <div className="workspace-heading"><div><h2>Placement preview</h2><p className="hint">The real Player renders the shared multi-instance scene using this production's saved layout configuration. This preview never changes live presentation state.</p></div><div className="profile-picker" role="group" aria-label="Placement preview profile">{(["desktop", "mobile", "tv"] as const).map((profile) => <button key={profile} className={previewProfile === profile ? "active" : ""} onClick={() => setPreviewProfile(profile)}>{profile}</button>)}</div></div>
       {layoutPreviewUrl ? <iframe title={`Placement Player ${previewProfile} preview`} src={layoutPreviewUrl} className={`player-preview player-preview--${previewProfile}`} /> : <p className="empty">Choose a channel to load the preview.</p>}
     </section>
 
-    <section className="section">
+    <section className="section" hidden={prepareTab !== "rundown"}>
       <h2>Rundown editor</h2>
       <div className="form"><label><span>Rundown name</span><input value={rundownName} onChange={(event) => setRundownName(event.target.value)} /></label><button disabled={!productionId} onClick={async () => { const result = await mutate(`/api/productions/${productionId}/rundowns`, "POST", { name: rundownName || "New rundown" }, "Rundown created"); if (result?.id) { setRundowns(await (await fetch(`/api/productions/${productionId}/rundowns`)).json() as Rundown[]); setRundownId(result.id); } }}>Create rundown</button><button disabled={!rundownId} onClick={() => mutate(`/api/rundowns/${rundownId}`, "PUT", { name: rundownName }, "Rundown saved", reloadRundownDefinition)}>Save rundown</button><button disabled={!rundownId} onClick={async () => { const result = await mutate(`/api/rundowns/${rundownId}/duplicate`, "POST", {}, "Rundown duplicated"); if (result?.id) { setRundowns(await (await fetch(`/api/productions/${productionId}/rundowns`)).json() as Rundown[]); setRundownId(result.id); } }}>Duplicate rundown</button></div>
       {rundownDefinition.map((cue, index) => <div className="cue-grid" key={cue.id}><strong>{cue.position}. {cue.label}</strong><span className="hint">{String(cue.commandPayload.k)} {cue.enabled ? "enabled" : "disabled"}</span><button onClick={() => editCue(cue, { enabled: !cue.enabled })}>{cue.enabled ? "Disable" : "Enable"}</button><button disabled={index === 0} onClick={() => moveCue(index, -1)}>Move up</button><button disabled={index === rundownDefinition.length - 1} onClick={() => moveCue(index, 1)}>Move down</button></div>)}
@@ -454,7 +456,7 @@ export default function App() {
       </div>
     </section>}
 
-    {workspace !== "run" && <section className="section">
+    {workspace !== "run" && <section className="section" hidden={workspace === "prepare" && prepareTab !== "rundown"}>
       <h2>Configurable presentation command</h2>
       <div className="form">
         <label><span>Action</span><select value={commandKind} onChange={(event) => { setCommandKind(event.target.value); setPrimary(""); setSecondary(""); setLabel(""); }}>
@@ -470,7 +472,7 @@ export default function App() {
       <p className="hint">Text is byte-bounded for the compact timed-ID3 envelope. Score, ticker, persistent sponsor, and clear update the late-join snapshot.</p>
     </section>}
 
-    {workspace === "prepare" && <section className="section">
+    {workspace === "prepare" && <section className="section" hidden={prepareTab !== "rundown"}>
       <h2>Custom legacy overlay</h2>
       <div className="form">
         <label><span>Title</span><input value={title} onChange={(event) => setTitle(event.target.value)} placeholder="e.g. Goal!" /></label>
