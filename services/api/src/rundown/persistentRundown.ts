@@ -75,6 +75,13 @@ export class PersistentRundown {
     return { ...(await this.snapshot(target, rundownId)), sessionId: session.id };
   }
 
+  async endSession(target: RundownTarget, sessionId: string, outcome: "complete" | "abandoned", rundownId = DEFAULT_RUNDOWN_ID) {
+    const session = await this.db.rundownExecutionSession.findFirst({ where: { id: sessionId, rundownId, mode: target, status: "active" } });
+    if (!session) throw new Error("active execution session not found");
+    await this.db.rundownExecutionSession.update({ where: { id: session.id }, data: { status: outcome, completedAt: new Date() } });
+    return this.snapshot(target, rundownId);
+  }
+
   private async session(rundownId: string, productionId: string, mode: RundownTarget, cues: PersistedCue[]) {
     const current = await this.db.rundownExecutionSession.findFirst({ where: { rundownId, mode, status: "active" }, orderBy: { startedAt: "desc" } });
     return current ?? this.db.rundownExecutionSession.create({ data: { rundownId, productionId, mode, status: "active", rundownSnapshot: this.createSnapshot(cues) as unknown as Prisma.InputJsonValue } });
