@@ -44,5 +44,6 @@ function placementStyle(instance: ResolvedPresentationInstance): CSSProperties {
     transform: `translate(${translateX}, calc(${translateY} + ${stackOffset}%)) rotate(${placement.rotation ?? 0}deg)`,
     zIndex: instance.entry.zIndex ?? instance.entry.priority,
     transitionDuration: `${instance.transition.durationMs}ms`,
+    animationDuration: `${instance.transition.durationMs}ms`,
   };
 }

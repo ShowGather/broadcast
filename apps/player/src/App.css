@@ -28,6 +28,13 @@ button { font: inherit; }
 .graphic--sponsor-panel b { color: #8be9ff; font-size: 1.05rem; }
 .graphic--sponsor-panel span { color: #aebbd0; font-size: .76rem; line-height: 1.45; }
 .presentation-region--video-overlay .graphic { position: absolute; transition: opacity var(--presentation-duration, 180ms) ease, transform var(--presentation-duration, 180ms) ease; }
+.graphic--cut { animation: none; }
+.graphic--fade { animation-name: presentation-fade-in; animation-timing-function: ease-out; }
+.graphic--slide { animation-name: presentation-slide-in; animation-timing-function: cubic-bezier(.2, .8, .2, 1); }
+.graphic--scale { animation-name: presentation-scale-in; animation-timing-function: cubic-bezier(.2, .8, .2, 1); }
+@keyframes presentation-fade-in { from { opacity: 0; } to { opacity: 1; } }
+@keyframes presentation-slide-in { from { opacity: 0; translate: 0 12px; } to { opacity: 1; translate: 0 0; } }
+@keyframes presentation-scale-in { from { opacity: 0; scale: .94; } to { opacity: 1; scale: 1; } }
 .graphic--scorebug { display: flex; align-items: center; gap: clamp(3px, 1cqw, 7px); padding: clamp(4px, 1.25cqw, 10px) clamp(6px, 1.5cqw, 12px); border: 1px solid rgba(137, 222, 255, .55); border-radius: 6px; background: rgba(6, 14, 25, .88); color: #f5fbff; font-size: clamp(.62rem, 2cqw, 1rem); backdrop-filter: blur(8px); }
 .graphic--scorebug b { font-size: clamp(.8rem, 2.5cqw, 1.25rem); }.graphic--scorebug i { color: #8093ad; font-style: normal; }.graphic--scorebug em { margin-left: 5px; color: #73e3ff; font-style: normal; font-variant-numeric: tabular-nums; }
 .graphic--scorebug-compact { display: grid; grid-template-columns: 1fr auto; gap: 1px 8px; }.graphic--scorebug-compact i { display: none; }.graphic--scorebug-compact em { grid-column: 1 / -1; margin-left: 0; }
