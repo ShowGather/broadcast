@@ -10,6 +10,8 @@ import {
 } from "@showgather/event-schema";
 import { encodeTpe1Frame } from "@showgather/id3";
 import { ChannelPresentationState } from "../presentation/channelState.js";
+import { prisma } from "../database/client.js";
+import { PersistentPresentationStore } from "../presentation/persistentStore.js";
 
 const INJECTOR_HOST = process.env.ID3_INJECTOR_HOST ?? "localhost";
 const INJECTOR_PORT = process.env.ID3_INJECTOR_PORT ?? "8080";
@@ -28,19 +30,41 @@ export interface StoredEvent {
   event: ShowGatherEvent;
   injectedAt: string;
   injectionResponse: unknown;
+  status?: "accepted" | "dispatched" | "failed";
+  revision?: number;
 }
 
 const events: StoredEvent[] = [];
 const channelPresentation = new ChannelPresentationState();
 // Preserve total order between revision assignment and the asynchronous injector.
 let dispatchTail: Promise<void> = Promise.resolve();
+const persistentStore = process.env.DATABASE_URL ? new PersistentPresentationStore(prisma, injectLiveEvent) : null;
+
+async function injectLiveEvent(event: ShowGatherEvent): Promise<unknown> {
+  const id3Base64 = Buffer.from(encodeTpe1Frame(encodeEvent(event))).toString("base64");
+  const response = await fetch(INJECTOR_URL, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ id3_base64: id3Base64 }) });
+  const body = await response.json().catch(() => null);
+  if (!response.ok) throw new Error(`injector rejected event (${response.status})${body ? `: ${JSON.stringify(body)}` : ""}`);
+  return body;
+}
 
 export async function dispatchLiveEvent(event: ShowGatherEvent): Promise<StoredEvent> {
+  if (persistentStore) {
+    const result = await persistentStore.accept(event);
+    const stored: StoredEvent = {
+      event: result.event,
+      injectedAt: new Date().toISOString(),
+      injectionResponse: { status: result.status, ...(result.error ? { error: result.error } : {}) },
+      status: result.status,
+      ...(result.revision !== undefined ? { revision: result.revision } : {}),
+    };
+    events.push(stored);
+    return stored;
+  }
   const dispatch = dispatchTail.then(async () => {
     const revised = channelPresentation.withRevision(event);
-    const id3Base64 = Buffer.from(encodeTpe1Frame(encodeEvent(revised))).toString("base64");
-    const injectorResponse = await fetch(INJECTOR_URL, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ id3_base64: id3Base64 }) });
-    const stored: StoredEvent = { event: revised, injectedAt: new Date().toISOString(), injectionResponse: await injectorResponse.json() };
+    const injectorResponse = await injectLiveEvent(revised);
+    const stored: StoredEvent = { event: revised, injectedAt: new Date().toISOString(), injectionResponse: injectorResponse, status: "dispatched", ...(revised.r !== undefined ? { revision: revised.r } : {}) };
     events.push(stored);
     channelPresentation.apply(revised);
     return stored;
@@ -89,5 +113,5 @@ export async function eventRoutes(app: FastifyInstance) {
   });
 
   app.get("/events", async () => events);
-  app.get("/presentation/snapshot", async () => channelPresentation.snapshot());
+  app.get("/presentation/snapshot", async () => persistentStore ? persistentStore.snapshot() : channelPresentation.snapshot());
 }

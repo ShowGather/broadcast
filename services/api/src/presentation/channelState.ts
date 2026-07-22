@@ -20,7 +20,7 @@ export class ChannelPresentationState {
 
   /** Add the next durable revision before an event is encoded into timed ID3. */
   withRevision(event: ShowGatherEvent): ShowGatherEvent {
-    if (!this.changesPersistentState(event)) return event;
+    if (!eventChangesPersistentState(event, this.revision + 1)) return event;
     return { ...event, r: this.revision + 1 };
   }
 
@@ -28,33 +28,14 @@ export class ChannelPresentationState {
     if (this.appliedEventIds.has(event.id)) return false;
     this.appliedEventIds.add(event.id);
 
-    const persistent = this.changesPersistentState(event);
+    const persistent = eventChangesPersistentState(event, this.revision + 1);
     if (!persistent) return false;
     if (event.r !== undefined && event.r <= this.revision) return false;
     if (event.r !== undefined && event.r !== this.revision + 1) {
       throw new Error(`presentation revision ${event.r} is not next after ${this.revision}`);
     }
 
-    if (event.t === "presentation.clear") {
-      this.state = applyPresentationCommand(this.state, { action: "clear", eventId: event.id, targetPts: 0 });
-      this.revision += 1;
-      return true;
-    }
-    if (event.t === "pc") {
-      for (const command of resolvePresentationCommand(event, this.revision + 1)) {
-        if (command.action === "activate" && command.durationMs !== undefined) continue;
-        this.state = applyPresentationCommand(this.state, command);
-      }
-      this.revision += 1;
-      return true;
-    }
-    if (event.t !== "presentation.cue") return false;
-    // Snapshot entries need a deterministic ordering even though their source
-    // PTS is only known at the browser. Revision is a local durable ordering.
-    for (const command of resolvePresentationCue(event, this.revision + 1)) {
-      if (command.action === "activate" && command.durationMs !== undefined) continue;
-      this.state = applyPresentationCommand(this.state, command);
-    }
+    this.state = applyPersistentEvent(this.state, event, this.revision + 1);
     this.revision += 1;
     return true;
   }
@@ -63,17 +44,33 @@ export class ChannelPresentationState {
     return createPersistentPresentationSnapshot(this.state, this.revision);
   }
 
-  private changesPersistentState(event: ShowGatherEvent): boolean {
-    return event.t === "presentation.clear" || (
-      event.t === "presentation.cue" &&
-      resolvePresentationCue(event, this.revision + 1).some(
-        (command) => command.action === "activate" && command.durationMs === undefined
-      )
-    ) || (
-      event.t === "pc" &&
-      resolvePresentationCommand(event, this.revision + 1).some(
-        (command) => command.action === "clear" || (command.action === "activate" && command.durationMs === undefined)
-      )
-    );
+}
+
+/** True when an event changes durable presentation state rather than only media-timed graphics. */
+export function eventChangesPersistentState(event: ShowGatherEvent, revision: number): boolean {
+  return event.t === "presentation.clear" || (
+    event.t === "presentation.cue" &&
+    resolvePresentationCue(event, revision).some((command) => command.action === "activate" && command.durationMs === undefined)
+  ) || (
+    event.t === "pc" &&
+    resolvePresentationCommand(event, revision).some(
+      (command) => command.action === "clear" || (command.action === "activate" && command.durationMs === undefined)
+    )
+  );
+}
+
+/** Applies only durable effects. Browser media PTS continues to govern transient commands. */
+export function applyPersistentEvent(state: PresentationState, event: ShowGatherEvent, revision: number): PresentationState {
+  if (event.t === "presentation.clear") {
+    return applyPresentationCommand(state, { action: "clear", eventId: event.id, targetPts: 0 });
   }
+  const commands = event.t === "pc"
+    ? resolvePresentationCommand(event, revision)
+    : event.t === "presentation.cue"
+      ? resolvePresentationCue(event, revision)
+      : [];
+  return commands.reduce(
+    (next, command) => command.action === "activate" && command.durationMs !== undefined ? next : applyPresentationCommand(next, command),
+    state
+  );
 }
