@@ -15,7 +15,7 @@ interface OutboxItem { id: string; eventId: string; revision: number; label: str
 type LayoutProfile = "desktop" | "tv" | "mobile";
 type LayoutSurface = "video" | "surround" | "companion";
 type LayoutAnchor = "top-left" | "top-centre" | "top-right" | "centre-left" | "centre" | "centre-right" | "bottom-left" | "bottom-centre" | "bottom-right";
-interface LayoutDefinition { instanceId: string; placementByProfile: Partial<Record<LayoutProfile, { surface: LayoutSurface; anchor: LayoutAnchor; x: number; y: number; width: number; safeArea?: boolean; layout: "single" | "column" | "overlay" }>>; }
+interface LayoutDefinition { instanceId: string; placementByProfile: Partial<Record<LayoutProfile, { surface: LayoutSurface; anchor: LayoutAnchor; x: number; y: number; width: number; safeArea?: boolean; layout: "single" | "column" | "overlay" }>>; variantByProfile?: Partial<Record<LayoutProfile, string>>; }
 
 const placementPreset = (surface: LayoutSurface, anchor: LayoutAnchor) => {
   const x = anchor.endsWith("left") || anchor.endsWith("right") ? .04 : 0;
@@ -90,6 +90,7 @@ export default function App() {
   const [layoutWidth, setLayoutWidth] = useState(.36);
   const [layoutSafeArea, setLayoutSafeArea] = useState(true);
   const [layoutPolicy, setLayoutPolicy] = useState<"single" | "column" | "overlay">("overlay");
+  const [layoutVariant, setLayoutVariant] = useState("standard");
   const [selectedElement, setSelectedElement] = useState("scorebug");
   const [configurations, setConfigurations] = useState<ShowConfiguration[]>([]);
   const workspace = route.workspace === "productions" ? "prepare" : route.workspace;
@@ -319,8 +320,8 @@ export default function App() {
   const saveLayoutPreset = () => setPresentationLayouts((current) => {
     const placement = { ...placementPreset(layoutSurface, layoutAnchor), x: layoutX, y: layoutY, width: layoutWidth, safeArea: layoutSafeArea, layout: layoutPolicy };
     const existing = current.find((definition) => definition.instanceId === layoutInstanceId);
-    if (existing) return current.map((definition) => definition.instanceId === layoutInstanceId ? { ...definition, placementByProfile: { ...definition.placementByProfile, [layoutProfile]: placement } } : definition);
-    return [...current, { instanceId: layoutInstanceId, placementByProfile: { [layoutProfile]: placement } }];
+    if (existing) return current.map((definition) => definition.instanceId === layoutInstanceId ? { ...definition, placementByProfile: { ...definition.placementByProfile, [layoutProfile]: placement }, variantByProfile: { ...definition.variantByProfile, [layoutProfile]: layoutVariant } } : definition);
+    return [...current, { instanceId: layoutInstanceId, placementByProfile: { [layoutProfile]: placement }, variantByProfile: { [layoutProfile]: layoutVariant } }];
   });
   const duplicateLayoutDefinition = (instanceId: string) => setPresentationLayouts((current) => {
     const source = current.find((definition) => definition.instanceId === instanceId); if (!source) return current;
@@ -412,6 +413,7 @@ export default function App() {
           <label><span>Profile</span><select value={layoutProfile} onChange={(event) => setLayoutProfile(event.target.value as LayoutProfile)}>{(["desktop", "tv", "mobile"] as const).map((profile) => <option key={profile}>{profile}</option>)}</select></label>
           <label><span>Surface</span><select value={layoutSurface} onChange={(event) => setLayoutSurface(event.target.value as LayoutSurface)}>{(["video", "surround", "companion"] as const).map((surface) => <option key={surface}>{surface}</option>)}</select></label>
           <label><span>Preset</span><select value={layoutAnchor} onChange={(event) => setLayoutAnchor(event.target.value as LayoutAnchor)}>{(["top-left", "top-centre", "top-right", "centre-left", "centre", "centre-right", "bottom-left", "bottom-centre", "bottom-right"] as const).map((anchor) => <option key={anchor}>{anchor}</option>)}</select></label>
+          <label><span>Profile variant</span><select value={layoutVariant} onChange={(event) => setLayoutVariant(event.target.value)}><option value="standard">Standard</option><option value="wide">Wide</option><option value="broadcast">Broadcast</option><option value="compact">Compact</option><option value="headline">Headline</option></select></label>
           <label><span>Horizontal offset</span><input type="number" min={0} max={1} step={.01} value={layoutX} onChange={(event) => setLayoutX(Number(event.target.value))} /></label><label><span>Vertical offset</span><input type="number" min={0} max={1} step={.01} value={layoutY} onChange={(event) => setLayoutY(Number(event.target.value))} /></label><label><span>Width</span><input type="number" min={.08} max={1} step={.01} value={layoutWidth} onChange={(event) => setLayoutWidth(Number(event.target.value))} /></label>
           <label><span>Collision policy</span><select value={layoutPolicy} onChange={(event) => setLayoutPolicy(event.target.value as "single" | "column" | "overlay")}><option value="overlay">Overlay</option><option value="column">Stack in column</option><option value="single">Single slot</option></select></label><label><span>Title/action safe area</span><input type="checkbox" checked={layoutSafeArea} onChange={(event) => setLayoutSafeArea(event.target.checked)} /></label>
           <button type="button" onClick={saveLayoutPreset}>Apply preset</button>
