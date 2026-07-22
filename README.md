@@ -53,6 +53,8 @@ Allow roughly a minute for stream health and services. Open:
 
 See [Pilot Demonstration Runbook](docs/Pilot%20Demonstration%20Runbook.md) for the repeatable rundown, rehearsal flow, recovery checks, logs, reset procedure, and screenshots.
 
+For the technical system overview, see [V1 Architecture](docs/V1%20Architecture.md).
+
 ```bash
 pnpm pilot:down
 ```
