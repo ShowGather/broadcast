@@ -1,10 +1,10 @@
 import type { CSSProperties, PropsWithChildren } from "react";
-import { resolvePresentationTarget, type PresentationItem, type PresentationRegionName, type ResolvedPresentationInstance, type ViewerProfile } from "@showgather/presentation-model";
+import { resolvePresentationTarget, type PresentationItem, type PresentationLayoutDefinition, type PresentationRegionName, type ResolvedPresentationInstance, type ViewerProfile } from "@showgather/presentation-model";
 import { usePresentation } from "./PresentationProvider";
 
-export function PresentationRegion({ name, profile = "desktop", children }: PropsWithChildren<{ name: PresentationRegionName; profile?: ViewerProfile }>) {
+export function PresentationRegion({ name, profile = "desktop", definitions, children }: PropsWithChildren<{ name: PresentationRegionName; profile?: ViewerProfile; definitions?: readonly PresentationLayoutDefinition[] }>) {
   const { state } = usePresentation();
-  const items = resolvePresentationTarget(state, name, profile);
+  const items = resolvePresentationTarget(state, name, profile, definitions);
   return <section className={`presentation-region presentation-region--${name.replace(".", "-")}`} aria-label={name}>
     {items.map((instance) => <Graphic key={`${instance.entry.eventId}:${instance.entry.instanceId}`} instance={instance} />)}
     {children}

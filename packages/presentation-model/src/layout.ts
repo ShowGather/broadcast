@@ -28,6 +28,12 @@ export interface ProfilePlacement {
 
 export type PlacementByProfile = Partial<Record<ViewerProfile, ProfilePlacement>>;
 export type VariantByProfile = Partial<Record<ViewerProfile, string>>;
+/** Persisted configuration that decorates a stable active instance ID. */
+export interface PresentationLayoutDefinition {
+  instanceId: string;
+  placementByProfile?: PlacementByProfile;
+  variantByProfile?: VariantByProfile;
+}
 export interface PresentationTransition {
   enter: PresentationTransitionKind;
   exit: PresentationTransitionKind;
@@ -76,12 +82,13 @@ export function placementFromPreset(surface: PresentationSurface, anchor: Presen
   return normalisePlacement({ ...PRESENTATION_PRESETS[anchor], surface, ...overrides, anchor });
 }
 
-export function resolvePresentationInstance(entry: PresentationEntry, profile: ViewerProfile): ResolvedPresentationInstance {
-  const placement = entry.placementByProfile?.[profile] ?? defaultPlacement(entry.item, entry.region, profile);
+export function resolvePresentationInstance(entry: PresentationEntry, profile: ViewerProfile, definitions: readonly PresentationLayoutDefinition[] = []): ResolvedPresentationInstance {
+  const definition = definitions.find((candidate) => candidate.instanceId === entry.instanceId);
+  const placement = entry.placementByProfile?.[profile] ?? definition?.placementByProfile?.[profile] ?? defaultPlacement(entry.item, entry.region, profile);
   return {
     entry,
     placement: normalisePlacement(placement),
-    variant: entry.variantByProfile?.[profile] ?? defaultVariant(entry.item, profile),
+    variant: entry.variantByProfile?.[profile] ?? definition?.variantByProfile?.[profile] ?? defaultVariant(entry.item, profile),
     transition: entry.transition ?? defaultTransition,
   };
 }
@@ -91,10 +98,10 @@ export function resolvePresentationInstance(entry: PresentationEntry, profile: V
  * TV move a legacy footer or rail graphic onto the video surface without
  * changing the command or stored content.
  */
-export function resolvePresentationTarget(state: PresentationState, target: PresentationRegionName, profile: ViewerProfile): ResolvedPresentationInstance[] {
+export function resolvePresentationTarget(state: PresentationState, target: PresentationRegionName, profile: ViewerProfile, definitions: readonly PresentationLayoutDefinition[] = []): ResolvedPresentationInstance[] {
   return PRESENTATION_REGIONS
     .flatMap((region) => resolvePresentationRegion(state, region))
-    .map((entry) => resolvePresentationInstance(entry, profile))
+    .map((entry) => resolvePresentationInstance(entry, profile, definitions))
     .filter((instance) => targetMatches(instance, target, profile))
     .sort((a, b) => (a.entry.zIndex ?? a.entry.priority) - (b.entry.zIndex ?? b.entry.priority) || a.entry.layer.localeCompare(b.entry.layer) || a.entry.instanceId.localeCompare(b.entry.instanceId));
 }

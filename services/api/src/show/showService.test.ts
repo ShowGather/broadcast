@@ -43,6 +43,18 @@ test("production duplication copies editable definitions but no execution state"
   } finally { await data.remove(); }
 });
 
+test("profile-aware layout definitions are persisted as bounded production configuration", { skip: !prisma }, async () => {
+  const data = await fixture();
+  try {
+    const show = new ShowService(prisma!);
+    const configuration = { presentationLayouts: [{ instanceId: "scorebug", placementByProfile: { tv: { surface: "video", anchor: "top-left", x: .04, y: .04, width: .28, safeArea: true, layout: "overlay" } } }] };
+    const production = await show.createProduction(data.channel.id, { title: "Match", configuration });
+    const saved = await prisma!.production.findUniqueOrThrow({ where: { id: production.id } });
+    assert.deepEqual(saved.configuration, configuration);
+    await assert.rejects(() => show.updateProduction(production.id, { configuration: { presentationLayouts: [{ instanceId: "bad layout", placementByProfile: {} }] } }), /stable instance IDs/);
+  } finally { await data.remove(); }
+});
+
 test("cue reordering stays contiguous and active execution uses its immutable snapshot", { skip: !prisma }, async () => {
   const data = await fixture();
   try {

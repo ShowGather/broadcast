@@ -34,7 +34,7 @@ function optionalConfiguration(value: unknown): Prisma.InputJsonValue | Prisma.J
   return value as Prisma.InputJsonValue;
 }
 function validateConfiguration(configuration: Record<string, unknown>) {
-  const allowed = new Set(["sport", "homeTeam", "awayTeam", "tickerLabel", "programmeTitle", "programmeSubtitle", "liveLabel", "accent", "enabledCompanionPanels", "companionPanelLabels", "viewerContext"]);
+  const allowed = new Set(["sport", "homeTeam", "awayTeam", "tickerLabel", "programmeTitle", "programmeSubtitle", "liveLabel", "accent", "enabledCompanionPanels", "companionPanelLabels", "viewerContext", "presentationLayouts"]);
   if (Object.keys(configuration).some((key) => !allowed.has(key))) throw new Error("configuration contains an unsupported field");
   for (const key of ["sport", "homeTeam", "awayTeam", "tickerLabel", "programmeTitle", "programmeSubtitle", "liveLabel", "viewerContext"] as const) {
     if (configuration[key] !== undefined && (typeof configuration[key] !== "string" || configuration[key].trim().length === 0 || configuration[key].length > 80)) throw new Error(`${key} must be 1-80 characters`);
@@ -44,6 +44,30 @@ function validateConfiguration(configuration: Record<string, unknown>) {
   if (panels !== undefined && (!Array.isArray(panels) || panels.some((panel) => panel !== "match" && panel !== "info" && panel !== "partners" && panel !== "interact"))) throw new Error("enabledCompanionPanels contains an unsupported panel");
   const labels = configuration.companionPanelLabels;
   if (labels !== undefined && (typeof labels !== "object" || labels === null || Array.isArray(labels) || Object.entries(labels as Record<string, unknown>).some(([key, label]) => !["match", "info", "partners", "interact"].includes(key) || typeof label !== "string" || label.length === 0 || label.length > 24))) throw new Error("companionPanelLabels contains an invalid label");
+  validatePresentationLayouts(configuration.presentationLayouts);
+}
+function validatePresentationLayouts(value: unknown) {
+  if (value === undefined) return;
+  if (!Array.isArray(value) || value.length > 20) throw new Error("presentationLayouts must contain at most 20 definitions");
+  const profiles = new Set(["desktop", "tv", "mobile"]);
+  const surfaces = new Set(["video", "surround", "companion"]);
+  const anchors = new Set(["top-left", "top-centre", "top-right", "centre-left", "centre", "centre-right", "bottom-left", "bottom-centre", "bottom-right"]);
+  const ids = new Set<string>();
+  for (const layout of value) {
+    if (typeof layout !== "object" || layout === null || Array.isArray(layout)) throw new Error("presentationLayouts contains an invalid definition");
+    const definition = layout as Record<string, unknown>;
+    if (typeof definition.instanceId !== "string" || !/^[a-z0-9][a-z0-9-]{0,79}$/i.test(definition.instanceId) || ids.has(definition.instanceId)) throw new Error("presentationLayouts requires unique stable instance IDs");
+    ids.add(definition.instanceId);
+    for (const field of ["placementByProfile", "variantByProfile"] as const) if (definition[field] !== undefined && (typeof definition[field] !== "object" || definition[field] === null || Array.isArray(definition[field]))) throw new Error(`${field} must be an object`);
+    if (definition.variantByProfile && Object.entries(definition.variantByProfile as Record<string, unknown>).some(([profile, variant]) => !profiles.has(profile) || typeof variant !== "string" || variant.length < 1 || variant.length > 32)) throw new Error("variantByProfile contains an invalid variant");
+    for (const [profile, placement] of Object.entries(definition.placementByProfile as Record<string, unknown> ?? {})) {
+      if (!profiles.has(profile) || typeof placement !== "object" || placement === null || Array.isArray(placement)) throw new Error("placementByProfile contains an invalid profile");
+      const item = placement as Record<string, unknown>;
+      if (!surfaces.has(String(item.surface)) || !anchors.has(String(item.anchor))) throw new Error("placement requires a supported surface and anchor");
+      for (const coordinate of ["x", "y", "width"] as const) if (typeof item[coordinate] !== "number" || !Number.isFinite(item[coordinate]) || item[coordinate] < 0 || item[coordinate] > 1) throw new Error(`placement ${coordinate} must be a normalised number`);
+      if (item.height !== undefined && (typeof item.height !== "number" || !Number.isFinite(item.height) || item.height < 0 || item.height > 1)) throw new Error("placement height must be a normalised number");
+    }
+  }
 }
 function optionalBoolean(value: unknown, field: string) {
   if (value === undefined) return undefined;

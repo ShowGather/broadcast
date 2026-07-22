@@ -12,6 +12,16 @@ interface Rundown { id: string; name: string; version: number; }
 interface RundownDefinitionCue { id: string; label: string; position: number; enabled: boolean; commandPayload: Record<string, unknown>; }
 interface ShowConfiguration { id: string; name: string; configuration: Record<string, unknown>; }
 interface OutboxItem { id: string; eventId: string; revision: number; label: string; status: "pending" | "dispatched" | "failed" | "cancelled"; error?: string; retryable: boolean; cancellable: boolean; }
+type LayoutProfile = "desktop" | "tv" | "mobile";
+type LayoutSurface = "video" | "surround" | "companion";
+type LayoutAnchor = "top-left" | "top-centre" | "top-right" | "centre-left" | "centre" | "centre-right" | "bottom-left" | "bottom-centre" | "bottom-right";
+interface LayoutDefinition { instanceId: string; placementByProfile: Partial<Record<LayoutProfile, { surface: LayoutSurface; anchor: LayoutAnchor; x: number; y: number; width: number; safeArea?: boolean; layout: "single" | "column" | "overlay" }>>; }
+
+const placementPreset = (surface: LayoutSurface, anchor: LayoutAnchor) => {
+  const x = anchor.endsWith("left") || anchor.endsWith("right") ? .04 : 0;
+  const y = anchor.startsWith("top") || anchor.startsWith("bottom") ? .04 : 0;
+  return { surface, anchor, x, y, width: surface === "surround" ? 1 : .36, safeArea: surface === "video", layout: anchor.startsWith("bottom") ? "column" as const : "overlay" as const };
+};
 
 function eventLabel(event: StoredEvent["event"]) {
   if (event.t === "presentation.cue") return `Cue: ${event.p.cue ?? "unknown"}`;
@@ -68,6 +78,11 @@ export default function App() {
   const [infoPanelLabel, setInfoPanelLabel] = useState("Info");
   const [partnersPanelLabel, setPartnersPanelLabel] = useState("Partners");
   const [interactPanelLabel, setInteractPanelLabel] = useState("Interact");
+  const [presentationLayouts, setPresentationLayouts] = useState<LayoutDefinition[]>([]);
+  const [layoutInstanceId, setLayoutInstanceId] = useState("scorebug");
+  const [layoutProfile, setLayoutProfile] = useState<LayoutProfile>("desktop");
+  const [layoutSurface, setLayoutSurface] = useState<LayoutSurface>("video");
+  const [layoutAnchor, setLayoutAnchor] = useState<LayoutAnchor>("top-left");
   const [configurations, setConfigurations] = useState<ShowConfiguration[]>([]);
   const workspace = route.workspace === "productions" ? "prepare" : route.workspace;
   const rehearsal = workspace === "rehearse";
@@ -265,6 +280,7 @@ export default function App() {
 
   const selectedProduction = productions.find((production) => production.id === productionId);
   const playerPreviewUrl = channelId ? `${window.location.protocol}//${window.location.hostname}:3003/player/${encodeURIComponent(channelId)}?profile=${previewProfile}&rehearsal=1&embedded=1&productionId=${encodeURIComponent(productionId)}` : "";
+  const layoutPreviewUrl = channelId ? `${window.location.protocol}//${window.location.hostname}:3003/player/${encodeURIComponent(channelId)}?scene=acceptance&profile=${previewProfile}&embedded=1&productionId=${encodeURIComponent(productionId)}` : "";
   const programmePreviewUrl = channelId ? `${window.location.protocol}//${window.location.hostname}:3003/player/${encodeURIComponent(channelId)}?profile=desktop&embedded=1&productionId=${encodeURIComponent(productionId)}` : "";
   const disabledCueCount = rundown.filter((cue) => !cue.enabled).length;
   const unresolvedOutbox = outbox.filter((item) => item.status === "failed" || item.status === "pending");
@@ -287,6 +303,12 @@ export default function App() {
   };
   const runCue = rundown[runCueIndex];
   const nextRunCue = rundown.slice(runCueIndex + 1).find((cue) => cue.enabled && cue.status !== "complete");
+  const saveLayoutPreset = () => setPresentationLayouts((current) => {
+    const placement = placementPreset(layoutSurface, layoutAnchor);
+    const existing = current.find((definition) => definition.instanceId === layoutInstanceId);
+    if (existing) return current.map((definition) => definition.instanceId === layoutInstanceId ? { ...definition, placementByProfile: { ...definition.placementByProfile, [layoutProfile]: placement } } : definition);
+    return [...current, { instanceId: layoutInstanceId, placementByProfile: { [layoutProfile]: placement } }];
+  });
 
   return <div className={`container workspace workspace--${workspace}`}>
     <header className="admin-shell__header"><div><a className="admin-shell__brand" href="/admin/productions" onClick={(event) => { event.preventDefault(); navigate({ workspace: "productions" }); }}>ShowGather</a><p>{workspace === "run" ? "Focused live operation" : workspace === "rehearse" ? "Safe rehearsal — no live presentation changes" : "Prepare saved productions and rundowns"}</p></div><div><p className={`connection connection--${apiConnection}`}>API {apiConnection}</p><p className={`connection connection--${streamConnection}`}>Stream {streamConnection}</p></div></header>
@@ -335,10 +357,24 @@ export default function App() {
           <label><span>Partners</span><input maxLength={30} value={partnersPanelLabel} onChange={(event) => setPartnersPanelLabel(event.target.value)} /></label>
           <label><span>Interact</span><input maxLength={30} value={interactPanelLabel} onChange={(event) => setInteractPanelLabel(event.target.value)} /></label>
         </fieldset>
-        <button onClick={() => mutate(`/api/channels/${channelId}/show-configurations`, "POST", { name: configurationName, configuration: { sport: "football", homeTeam, awayTeam, tickerLabel, ...(programmeTitle.trim() ? { programmeTitle: programmeTitle.trim() } : {}), ...(programmeSubtitle.trim() ? { programmeSubtitle: programmeSubtitle.trim() } : {}), ...(liveLabel.trim() ? { liveLabel: liveLabel.trim() } : {}), accent, enabledCompanionPanels: enabledPanels, companionPanelLabels: { match: matchPanelLabel.trim() || "Match", info: infoPanelLabel.trim() || "Info", partners: partnersPanelLabel.trim() || "Partners", interact: interactPanelLabel.trim() || "Interact" } } }, "Show configuration saved", reloadConfigurations)}>Save reusable configuration</button>
+        <fieldset className="panel-options"><legend>Presentation placement presets</legend>
+          <p className="hint">Choose an active presentation instance and a profile-specific destination. These settings are saved with the reusable show package.</p>
+          <label><span>Instance</span><select value={layoutInstanceId} onChange={(event) => setLayoutInstanceId(event.target.value)}><option value="scorebug">Main scorebug</option><option value="lower-third">Lower third</option><option value="primary">Sponsor panel</option><option value="ticker">Ticker</option><option value="scorebug-main">Acceptance scene scorebug</option><option value="lower-third-presenter-a">Acceptance presenter A</option><option value="lower-third-presenter-b">Acceptance presenter B</option><option value="sponsor-top-right">Acceptance sponsor</option><option value="programme-clock">Programme clock</option></select></label>
+          <label><span>Profile</span><select value={layoutProfile} onChange={(event) => setLayoutProfile(event.target.value as LayoutProfile)}>{(["desktop", "tv", "mobile"] as const).map((profile) => <option key={profile}>{profile}</option>)}</select></label>
+          <label><span>Surface</span><select value={layoutSurface} onChange={(event) => setLayoutSurface(event.target.value as LayoutSurface)}>{(["video", "surround", "companion"] as const).map((surface) => <option key={surface}>{surface}</option>)}</select></label>
+          <label><span>Preset</span><select value={layoutAnchor} onChange={(event) => setLayoutAnchor(event.target.value as LayoutAnchor)}>{(["top-left", "top-centre", "top-right", "centre-left", "centre", "centre-right", "bottom-left", "bottom-centre", "bottom-right"] as const).map((anchor) => <option key={anchor}>{anchor}</option>)}</select></label>
+          <button type="button" onClick={saveLayoutPreset}>Apply preset</button>
+          {presentationLayouts.length > 0 && <ul className="placement-summary">{presentationLayouts.map((definition) => <li key={definition.instanceId}><b>{definition.instanceId}</b> · {Object.entries(definition.placementByProfile).map(([profile, placement]) => `${profile}: ${placement?.surface} ${placement?.anchor}`).join(" · ")}</li>)}</ul>}
+        </fieldset>
+        <button onClick={() => mutate(`/api/channels/${channelId}/show-configurations`, "POST", { name: configurationName, configuration: { sport: "football", homeTeam, awayTeam, tickerLabel, ...(programmeTitle.trim() ? { programmeTitle: programmeTitle.trim() } : {}), ...(programmeSubtitle.trim() ? { programmeSubtitle: programmeSubtitle.trim() } : {}), ...(liveLabel.trim() ? { liveLabel: liveLabel.trim() } : {}), accent, enabledCompanionPanels: enabledPanels, companionPanelLabels: { match: matchPanelLabel.trim() || "Match", info: infoPanelLabel.trim() || "Info", partners: partnersPanelLabel.trim() || "Partners", interact: interactPanelLabel.trim() || "Interact" }, ...(presentationLayouts.length ? { presentationLayouts } : {}) } }, "Show configuration saved", reloadConfigurations)}>Save reusable configuration</button>
         <label><span>Copy into production</span><select onChange={(event) => { if (event.target.value) mutate(`/api/productions/${productionId}/copy-configuration`, "POST", { configurationId: event.target.value }, "Configuration copied into production", reloadProduction); }} defaultValue=""><option value="">Choose a saved package</option>{configurations.map((configuration) => <option key={configuration.id} value={configuration.id}>{configuration.name}</option>)}</select></label>
       </div>
       <p className="hint">Packages are copied into a production deliberately. Changing a package never rewrites an existing production.</p>
+    </section>
+
+    <section className="section rehearsal-preview">
+      <div className="workspace-heading"><div><h2>Placement preview</h2><p className="hint">The real Player renders the shared multi-instance scene using this production's saved layout configuration. This preview never changes live presentation state.</p></div><div className="profile-picker" role="group" aria-label="Placement preview profile">{(["desktop", "mobile", "tv"] as const).map((profile) => <button key={profile} className={previewProfile === profile ? "active" : ""} onClick={() => setPreviewProfile(profile)}>{profile}</button>)}</div></div>
+      {layoutPreviewUrl ? <iframe title={`Placement Player ${previewProfile} preview`} src={layoutPreviewUrl} className={`player-preview player-preview--${previewProfile}`} /> : <p className="empty">Choose a channel to load the preview.</p>}
     </section>
 
     <section className="section">
