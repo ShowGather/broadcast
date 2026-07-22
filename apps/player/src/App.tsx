@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState, type CSSProperties } from "react";
 import type { ShowGatherEvent } from "@showgather/event-schema";
 import type { PresentationSnapshot } from "@showgather/presentation-model";
 import { useSyncClient } from "./useSyncClient";
@@ -17,6 +17,18 @@ function deltaClass(delta: number | null): string {
   return "red";
 }
 
+interface ViewerContext { programmeTitle: string; programmeSubtitle?: string; liveLabel: string; accent: string; }
+const defaultViewerContext: ViewerContext = { programmeTitle: "ShowGather Viewer", liveLabel: "LIVE", accent: "#73e3ff" };
+function viewerContextFromProduction(data: { title?: unknown; configuration?: unknown }): ViewerContext {
+  const configuration = typeof data.configuration === "object" && data.configuration !== null ? data.configuration as Record<string, unknown> : {};
+  return {
+    programmeTitle: typeof configuration.programmeTitle === "string" ? configuration.programmeTitle : typeof data.title === "string" ? data.title : defaultViewerContext.programmeTitle,
+    ...(typeof configuration.programmeSubtitle === "string" ? { programmeSubtitle: configuration.programmeSubtitle } : {}),
+    liveLabel: typeof configuration.liveLabel === "string" ? configuration.liveLabel : defaultViewerContext.liveLabel,
+    accent: typeof configuration.accent === "string" && /^#[0-9a-fA-F]{6}$/.test(configuration.accent) ? configuration.accent : defaultViewerContext.accent,
+  };
+}
+
 function ViewerExperience() {
   const videoRef = useRef<HTMLVideoElement>(null);
   const search = new URLSearchParams(window.location.search);
@@ -24,7 +36,9 @@ function ViewerExperience() {
   const [profile, setProfile] = useState<ViewerProfile>(requestedProfile === "mobile" || requestedProfile === "tv" ? requestedProfile : "desktop");
   const rehearsal = search.get("rehearsal") === "1";
   const embedded = search.get("embedded") === "1";
+  const productionId = search.get("productionId");
   const channelId = window.location.pathname.match(/^\/player\/([^/]+)/)?.[1];
+  const [viewerContext, setViewerContext] = useState<ViewerContext>(defaultViewerContext);
   const { applyCommand, expireAt, replaceState } = usePresentation();
   const revisionGate = useRef(new PersistentRevisionGate());
   const hydrateSnapshot = useCallback(() => {
@@ -41,6 +55,13 @@ function ViewerExperience() {
       .catch(() => { /* The baseline remains available if the API is temporarily unreachable. */ });
     return () => { active = false; };
   }, [hydrateSnapshot]);
+  useEffect(() => {
+    if (!productionId) return;
+    fetch(`/api/productions/${encodeURIComponent(productionId)}`)
+      .then((response) => response.ok ? response.json() : Promise.reject(new Error("production unavailable")))
+      .then((production) => setViewerContext(viewerContextFromProduction(production)))
+      .catch(() => { /* Audience viewing remains available with safe defaults. */ });
+  }, [productionId]);
   const onTimedEvent = useCallback((event: ShowGatherEvent, targetPts: number) => {
     const decision = revisionGate.current.applyEvent(event.r);
     if (decision.needsRecovery) hydrateSnapshot().catch(() => {});
@@ -76,14 +97,14 @@ function ViewerExperience() {
     </table>
   </aside>;
 
-  return <div className={`app ${embedded ? "app--embedded" : ""}`}>
+  return <div className={`app ${embedded ? "app--embedded" : ""}`} style={{ "--viewer-accent": viewerContext.accent } as CSSProperties}>
     {!embedded && <header className="app-header">
-      <div><h1>ShowGather Viewer</h1><span className="status">{status}{rehearsal ? " • rehearsal listener active" : ""}</span></div>
+      <div><span className="viewer-context__live">{viewerContext.liveLabel}</span><h1>{viewerContext.programmeTitle}</h1><span className="status">{viewerContext.programmeSubtitle ?? status}{rehearsal ? " • rehearsal listener active" : ""}</span></div>
       <div className="profile-switcher" aria-label="Preview profile">
         {(["desktop", "mobile", "tv"] as ViewerProfile[]).map((candidate) => <button key={candidate} className={profile === candidate ? "active" : ""} onClick={() => setProfile(candidate)}>{candidate}</button>)}
       </div>
     </header>}
-    {embedded && <p className="embedded-status">Preview · {channelId ? `channel ${channelId}` : "selected channel"}{rehearsal ? " · rehearsal" : ""}</p>}
+    {embedded && <p className="embedded-status">{viewerContext.liveLabel} · {viewerContext.programmeTitle}{channelId ? ` · channel ${channelId}` : ""}{rehearsal ? " · rehearsal" : ""}</p>}
     <ViewerShell profile={profile} video={video} diagnostics={diagnostics} />
   </div>;
 }

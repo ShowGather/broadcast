@@ -30,7 +30,20 @@ function optionalConfiguration(value: unknown): Prisma.InputJsonValue | Prisma.J
   if (value === undefined) return undefined;
   if (value === null) return Prisma.JsonNull;
   if (typeof value !== "object" || Array.isArray(value)) throw new Error("configuration must be an object");
+  validateConfiguration(value as Record<string, unknown>);
   return value as Prisma.InputJsonValue;
+}
+function validateConfiguration(configuration: Record<string, unknown>) {
+  const allowed = new Set(["sport", "homeTeam", "awayTeam", "tickerLabel", "programmeTitle", "programmeSubtitle", "liveLabel", "accent", "enabledCompanionPanels", "companionPanelLabels", "viewerContext"]);
+  if (Object.keys(configuration).some((key) => !allowed.has(key))) throw new Error("configuration contains an unsupported field");
+  for (const key of ["sport", "homeTeam", "awayTeam", "tickerLabel", "programmeTitle", "programmeSubtitle", "liveLabel", "viewerContext"] as const) {
+    if (configuration[key] !== undefined && (typeof configuration[key] !== "string" || configuration[key].trim().length === 0 || configuration[key].length > 80)) throw new Error(`${key} must be 1-80 characters`);
+  }
+  if (configuration.accent !== undefined && (typeof configuration.accent !== "string" || !/^#[0-9a-fA-F]{6}$/.test(configuration.accent))) throw new Error("accent must be a hex colour");
+  const panels = configuration.enabledCompanionPanels;
+  if (panels !== undefined && (!Array.isArray(panels) || panels.some((panel) => panel !== "match" && panel !== "info" && panel !== "partners" && panel !== "interact"))) throw new Error("enabledCompanionPanels contains an unsupported panel");
+  const labels = configuration.companionPanelLabels;
+  if (labels !== undefined && (typeof labels !== "object" || labels === null || Array.isArray(labels) || Object.entries(labels as Record<string, unknown>).some(([key, label]) => !["match", "info", "partners", "interact"].includes(key) || typeof label !== "string" || label.length === 0 || label.length > 24))) throw new Error("companionPanelLabels contains an invalid label");
 }
 function optionalBoolean(value: unknown, field: string) {
   if (value === undefined) return undefined;

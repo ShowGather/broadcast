@@ -8,7 +8,7 @@ button { font: inherit; }
 .status { display: block; margin-top: 3px; color: #8b9bb5; font-size: .78rem; }
 .profile-switcher { display: flex; gap: 4px; padding: 4px; border: 1px solid #263248; border-radius: 8px; background: #101722; }
 .profile-switcher button { border: 0; border-radius: 5px; padding: 6px 10px; color: #9daac0; background: transparent; text-transform: capitalize; cursor: pointer; font-size: .78rem; }
-.profile-switcher button.active { color: #07111c; background: #73e3ff; font-weight: 700; }
+.profile-switcher button.active { color: #07111c; background: var(--viewer-accent, #73e3ff); font-weight: 700; }.viewer-context__live { display: inline-block; margin-bottom: 4px; color: #07111c; background: var(--viewer-accent, #73e3ff); border-radius: 4px; padding: 3px 6px; font-size: .65rem; font-weight: 850; letter-spacing: .08em; }
 
 .viewer-shell { display: grid; gap: 12px; }
 .viewer-shell__main { display: grid; grid-template-columns: minmax(150px, .55fr) minmax(0, 2.6fr) minmax(150px, .55fr); gap: 12px; align-items: stretch; }

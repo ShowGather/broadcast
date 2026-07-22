@@ -57,6 +57,10 @@ export default function App() {
   const [homeTeam, setHomeTeam] = useState("HOME");
   const [awayTeam, setAwayTeam] = useState("AWAY");
   const [tickerLabel, setTickerLabel] = useState("LIVE");
+  const [programmeTitle, setProgrammeTitle] = useState("");
+  const [programmeSubtitle, setProgrammeSubtitle] = useState("");
+  const [liveLabel, setLiveLabel] = useState("LIVE");
+  const [accent, setAccent] = useState("#73e3ff");
   const [configurations, setConfigurations] = useState<ShowConfiguration[]>([]);
   const workspace = route.workspace === "productions" ? "prepare" : route.workspace;
   const rehearsal = workspace === "rehearse";
@@ -300,7 +304,11 @@ export default function App() {
         <label><span>Home team</span><input maxLength={20} value={homeTeam} onChange={(event) => setHomeTeam(event.target.value)} /></label>
         <label><span>Away team</span><input maxLength={20} value={awayTeam} onChange={(event) => setAwayTeam(event.target.value)} /></label>
         <label><span>Ticker label</span><input maxLength={12} value={tickerLabel} onChange={(event) => setTickerLabel(event.target.value)} /></label>
-        <button onClick={() => mutate(`/api/channels/${channelId}/show-configurations`, "POST", { name: configurationName, configuration: { sport: "football", homeTeam, awayTeam, tickerLabel } }, "Show configuration saved", reloadConfigurations)}>Save reusable configuration</button>
+        <label><span>Programme title</span><input maxLength={80} value={programmeTitle} onChange={(event) => setProgrammeTitle(event.target.value)} placeholder="Saturday Match" /></label>
+        <label><span>Programme subtitle</span><input maxLength={80} value={programmeSubtitle} onChange={(event) => setProgrammeSubtitle(event.target.value)} placeholder="Live from the stadium" /></label>
+        <label><span>Live label</span><input maxLength={80} value={liveLabel} onChange={(event) => setLiveLabel(event.target.value)} /></label>
+        <label><span>Accent</span><input pattern="#[0-9a-fA-F]{6}" value={accent} onChange={(event) => setAccent(event.target.value)} /></label>
+        <button onClick={() => mutate(`/api/channels/${channelId}/show-configurations`, "POST", { name: configurationName, configuration: { sport: "football", homeTeam, awayTeam, tickerLabel, ...(programmeTitle.trim() ? { programmeTitle: programmeTitle.trim() } : {}), ...(programmeSubtitle.trim() ? { programmeSubtitle: programmeSubtitle.trim() } : {}), ...(liveLabel.trim() ? { liveLabel: liveLabel.trim() } : {}), accent } }, "Show configuration saved", reloadConfigurations)}>Save reusable configuration</button>
         <label><span>Copy into production</span><select onChange={(event) => { if (event.target.value) mutate(`/api/productions/${productionId}/copy-configuration`, "POST", { configurationId: event.target.value }, "Configuration copied into production", reloadProduction); }} defaultValue=""><option value="">Choose a saved package</option>{configurations.map((configuration) => <option key={configuration.id} value={configuration.id}>{configuration.name}</option>)}</select></label>
       </div>
       <p className="hint">Packages are copied into a production deliberately. Changing a package never rewrites an existing production.</p>
