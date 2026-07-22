@@ -84,6 +84,7 @@ export default function App() {
   const [layoutProfile, setLayoutProfile] = useState<LayoutProfile>("desktop");
   const [layoutSurface, setLayoutSurface] = useState<LayoutSurface>("video");
   const [layoutAnchor, setLayoutAnchor] = useState<LayoutAnchor>("top-left");
+  const [selectedElement, setSelectedElement] = useState("scorebug");
   const [configurations, setConfigurations] = useState<ShowConfiguration[]>([]);
   const workspace = route.workspace === "productions" ? "prepare" : route.workspace;
   const rehearsal = workspace === "rehearse";
@@ -311,6 +312,19 @@ export default function App() {
     if (existing) return current.map((definition) => definition.instanceId === layoutInstanceId ? { ...definition, placementByProfile: { ...definition.placementByProfile, [layoutProfile]: placement } } : definition);
     return [...current, { instanceId: layoutInstanceId, placementByProfile: { [layoutProfile]: placement } }];
   });
+  const chooseElement = (kind: "scorebug" | "lower-third" | "ticker" | "alert" | "sponsor-panel" | "clock") => {
+    const defaults: Record<typeof kind, { instanceId: string; command?: string; surface: LayoutSurface; anchor: LayoutAnchor }> = {
+      scorebug: { instanceId: "scorebug-main", command: "score", surface: "video", anchor: "top-left" },
+      "lower-third": { instanceId: "lower-third-presenter-a", command: "lower", surface: "video", anchor: "bottom-left" },
+      ticker: { instanceId: "ticker-main", command: "ticker", surface: "surround", anchor: "bottom-centre" },
+      alert: { instanceId: "alert-main", command: "alert", surface: "video", anchor: "centre" },
+      "sponsor-panel": { instanceId: "sponsor-top-right", command: "sponsor", surface: "surround", anchor: "top-right" },
+      clock: { instanceId: "programme-clock", surface: "video", anchor: "top-centre" },
+    };
+    const selected = defaults[kind];
+    setSelectedElement(kind); if (selected.command) setCommandKind(selected.command); setCommandInstanceId(selected.instanceId); setLayoutInstanceId(selected.instanceId); setLayoutSurface(selected.surface); setLayoutAnchor(selected.anchor);
+    setStatus(selected.command ? `${kind} selected. Choose a profile and apply a placement preset, then configure its typed command.` : `${kind} selected. Configure its profile placement; programme clock content is currently supplied by a scene or future clock command.`);
+  };
 
   return <div className={`container workspace workspace--${workspace}`}>
     <header className="admin-shell__header"><div><a className="admin-shell__brand" href="/admin/productions" onClick={(event) => { event.preventDefault(); navigate({ workspace: "productions" }); }}>ShowGather</a><p>{workspace === "run" ? "Focused live operation" : workspace === "rehearse" ? "Safe rehearsal — no live presentation changes" : "Prepare saved productions and rundowns"}</p></div><div><p className={`connection connection--${apiConnection}`}>API {apiConnection}</p><p className={`connection connection--${streamConnection}`}>Stream {streamConnection}</p></div></header>
@@ -335,6 +349,12 @@ export default function App() {
     </section>}
 
     {workspace === "prepare" && <><section className="section">
+      <h2>Elements</h2>
+      <p className="hint">Choose a presentation source to target its stable instance, suggested command, and placement preset. Elements are constrained to recognised component types and named placements.</p>
+      <div className="element-library" role="list" aria-label="Presentation elements">
+        {(["scorebug", "lower-third", "ticker", "alert", "sponsor-panel", "clock"] as const).map((kind) => <button key={kind} type="button" role="listitem" className={selectedElement === kind ? "active" : ""} onClick={() => chooseElement(kind)}>{kind === "sponsor-panel" ? "Sponsor bug" : kind.replace("-", " ")}</button>)}
+      </div>
+    </section><section className="section">
       <h2>Production editor</h2>
       <div className="form">
         <label><span>Title</span><input value={productionTitle} onChange={(event) => setProductionTitle(event.target.value)} /></label>
