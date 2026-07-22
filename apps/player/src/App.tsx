@@ -8,6 +8,7 @@ import { createDemoPresentationState } from "./presentation/demoState";
 import { resolveTimedPresentationEvent } from "./presentation/cues";
 import { PersistentRevisionGate } from "./presentation/persistentRevision";
 import { ViewerShell, type ViewerProfile } from "./viewer/ViewerShell";
+import type { CompanionPanel, CompanionPanelLabels } from "./viewer/InteractivePanels";
 
 function deltaClass(delta: number | null): string {
   if (delta === null) return "pending";
@@ -17,15 +18,20 @@ function deltaClass(delta: number | null): string {
   return "red";
 }
 
-interface ViewerContext { programmeTitle: string; programmeSubtitle?: string; liveLabel: string; accent: string; }
-const defaultViewerContext: ViewerContext = { programmeTitle: "ShowGather Viewer", liveLabel: "LIVE", accent: "#73e3ff" };
+interface ViewerContext { programmeTitle: string; programmeSubtitle?: string; liveLabel: string; accent: string; enabledPanels: CompanionPanel[]; panelLabels: CompanionPanelLabels; }
+const defaultViewerContext: ViewerContext = { programmeTitle: "ShowGather Viewer", liveLabel: "LIVE", accent: "#73e3ff", enabledPanels: ["match", "info", "partners", "interact"], panelLabels: {} };
 function viewerContextFromProduction(data: { title?: unknown; configuration?: unknown }): ViewerContext {
   const configuration = typeof data.configuration === "object" && data.configuration !== null ? data.configuration as Record<string, unknown> : {};
+  const enabledPanels = Array.isArray(configuration.enabledCompanionPanels) ? configuration.enabledCompanionPanels.filter((panel): panel is CompanionPanel => panel === "match" || panel === "info" || panel === "partners" || panel === "interact") : defaultViewerContext.enabledPanels;
+  const rawLabels = typeof configuration.companionPanelLabels === "object" && configuration.companionPanelLabels !== null ? configuration.companionPanelLabels as Record<string, unknown> : {};
+  const panelLabels = Object.fromEntries(Object.entries(rawLabels).filter(([panel, label]) => (panel === "match" || panel === "info" || panel === "partners" || panel === "interact") && typeof label === "string")) as CompanionPanelLabels;
   return {
     programmeTitle: typeof configuration.programmeTitle === "string" ? configuration.programmeTitle : typeof data.title === "string" ? data.title : defaultViewerContext.programmeTitle,
     ...(typeof configuration.programmeSubtitle === "string" ? { programmeSubtitle: configuration.programmeSubtitle } : {}),
     liveLabel: typeof configuration.liveLabel === "string" ? configuration.liveLabel : defaultViewerContext.liveLabel,
     accent: typeof configuration.accent === "string" && /^#[0-9a-fA-F]{6}$/.test(configuration.accent) ? configuration.accent : defaultViewerContext.accent,
+    enabledPanels: enabledPanels.length ? enabledPanels : defaultViewerContext.enabledPanels,
+    panelLabels,
   };
 }
 
@@ -105,7 +111,7 @@ function ViewerExperience() {
       </div>
     </header>}
     {embedded && <p className="embedded-status">{viewerContext.liveLabel} · {viewerContext.programmeTitle}{channelId ? ` · channel ${channelId}` : ""}{rehearsal ? " · rehearsal" : ""}</p>}
-    <ViewerShell profile={profile} video={video} diagnostics={diagnostics} />
+    <ViewerShell profile={profile} video={video} diagnostics={diagnostics} enabledPanels={viewerContext.enabledPanels} panelLabels={viewerContext.panelLabels} />
   </div>;
 }
 
