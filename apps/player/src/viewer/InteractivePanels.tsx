@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { resolvePresentationRegion, type PresentationItem } from "@showgather/presentation-model";
+import { resolvePresentationRegion, resolvePresentationSurface, type PresentationItem, type PresentationLayoutDefinition } from "@showgather/presentation-model";
 import { usePresentation } from "../presentation/PresentationProvider";
 
 export type CompanionPanel = "match" | "info" | "partners" | "interact";
@@ -9,7 +9,7 @@ function first(items: PresentationItem[], kind: PresentationItem["kind"]) {
   return items.find((item) => item.kind === kind);
 }
 
-export function InteractivePanels({ enabled = ["match", "info", "partners", "interact"], labels = {} }: { enabled?: CompanionPanel[]; labels?: CompanionPanelLabels }) {
+export function InteractivePanels({ enabled = ["match", "info", "partners", "interact"], labels = {}, layoutDefinitions = [] }: { enabled?: CompanionPanel[]; labels?: CompanionPanelLabels; layoutDefinitions?: readonly PresentationLayoutDefinition[] }) {
   const [panel, setPanel] = useState<CompanionPanel>(enabled[0] ?? "match");
   const tabs = useRef<Array<HTMLButtonElement | null>>([]);
   useEffect(() => { if (!enabled.includes(panel)) setPanel(enabled[0] ?? "match"); }, [enabled, panel]);
@@ -21,6 +21,10 @@ export function InteractivePanels({ enabled = ["match", "info", "partners", "int
   const sponsors = rails.flatMap((region) => resolvePresentationRegion(state, region).map((entry) => entry.item)).filter((item) => item.kind === "sponsor-panel");
   const score = first(overlay, "scorebug");
   const ticker = first(footer, "ticker") ?? first(header, "ticker");
+  const companion = resolvePresentationSurface(state, "companion", "mobile", layoutDefinitions).map((instance) => instance.entry.item);
+  const companionSponsors = companion.filter((item) => item.kind === "sponsor-panel");
+  const companionTicker = first(companion, "ticker");
+  const informationTicker = companionTicker?.kind === "ticker" ? companionTicker : ticker?.kind === "ticker" ? ticker : undefined;
 
   const onKeyDown = (event: React.KeyboardEvent<HTMLButtonElement>, index: number) => {
     if (event.key !== "ArrowRight" && event.key !== "ArrowLeft" && event.key !== "Home" && event.key !== "End") return;
@@ -37,8 +41,8 @@ export function InteractivePanels({ enabled = ["match", "info", "partners", "int
     {panel === "match" && <div id="companion-panel-match" role="tabpanel" aria-labelledby="companion-tab-match" className="interactive-panels__content">
       {score?.kind === "scorebug" ? <><strong>{score.homeTeam} <b>{score.homeScore}</b> – <b>{score.awayScore}</b> {score.awayTeam}</strong><span>{score.clock ?? "Live"} • presentation follows programme media time</span></> : <span>Waiting for match state…</span>}
     </div>}
-    {panel === "info" && <div id="companion-panel-info" role="tabpanel" aria-labelledby="companion-tab-info" className="interactive-panels__content">{ticker?.kind === "ticker" ? <><strong>{ticker.label ?? "SHOWGATHER LIVE"}</strong><span>{ticker.text}</span></> : <span>Programme information will appear here.</span>}</div>}
-    {panel === "partners" && <div id="companion-panel-partners" role="tabpanel" aria-labelledby="companion-tab-partners" className="interactive-panels__content">{sponsors.length ? sponsors.map((sponsor) => sponsor.kind === "sponsor-panel" && <div key={sponsor.brand}><strong>{sponsor.brand}</strong><span>{sponsor.tagline}</span></div>) : <span>No partner content is active.</span>}</div>}
+    {panel === "info" && <div id="companion-panel-info" role="tabpanel" aria-labelledby="companion-tab-info" className="interactive-panels__content">{informationTicker ? <><strong>{informationTicker.label ?? "SHOWGATHER LIVE"}</strong><span>{informationTicker.text}</span></> : <span>Programme information will appear here.</span>}</div>}
+    {panel === "partners" && <div id="companion-panel-partners" role="tabpanel" aria-labelledby="companion-tab-partners" className="interactive-panels__content">{[...companionSponsors, ...sponsors].length ? [...companionSponsors, ...sponsors].map((sponsor, index) => sponsor.kind === "sponsor-panel" && <div key={`${sponsor.brand}-${index}`}><strong>{sponsor.brand}</strong><span>{sponsor.tagline}</span></div>) : <span>No partner content is active.</span>}</div>}
     {panel === "interact" && <div id="companion-panel-interact" role="tabpanel" aria-labelledby="companion-tab-interact" className="interactive-panels__content"><strong>Interactive</strong><span>Audience choices and live participation will appear here when enabled for this programme.</span></div>}
   </section>;
 }

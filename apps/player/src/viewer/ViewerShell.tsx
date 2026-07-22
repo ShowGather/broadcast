@@ -19,7 +19,7 @@ export function ViewerShell({ profile, video, diagnostics, enabledPanels, panelL
       <div className="viewer-shell__programme">{video}</div>
       {hasRight && <PresentationRegion name="right.rail" profile={profile} definitions={layoutDefinitions} />}
     </div>
-    {profile === "mobile" && <InteractivePanels enabled={enabledPanels} labels={panelLabels} />}
+    {profile === "mobile" && <InteractivePanels enabled={enabledPanels} labels={panelLabels} layoutDefinitions={layoutDefinitions} />}
     {hasFooter && <PresentationRegion name="footer" profile={profile} definitions={layoutDefinitions} />}
     {diagnostics}
   </main>;

@@ -288,4 +288,4 @@ function mapRegions(
 
 export { resolvePresentationCue, type PresentationCueInput, type PresentationCueKey } from "./cues.js";
 export { resolvePresentationCommand, type PresentationCommandInput, type PresentationCommandPayload } from "./commands.js";
-export { placementFromPreset, normalisePlacement, resolvePresentationInstance, resolvePresentationTarget, PRESENTATION_PRESETS, type PlacementByProfile, type PresentationAnchor, type PresentationLayoutDefinition, type PresentationSurface, type PresentationTransition, type PresentationTransitionKind, type ProfilePlacement, type ResolvedPresentationInstance, type ViewerProfile, type VariantByProfile } from "./layout.js";
+export { placementFromPreset, normalisePlacement, resolvePresentationInstance, resolvePresentationSurface, resolvePresentationTarget, PRESENTATION_PRESETS, type PlacementByProfile, type PresentationAnchor, type PresentationLayoutDefinition, type PresentationSurface, type PresentationTransition, type PresentationTransitionKind, type ProfilePlacement, type ResolvedPresentationInstance, type ViewerProfile, type VariantByProfile } from "./layout.js";

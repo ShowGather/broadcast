@@ -106,6 +106,10 @@ export function resolvePresentationTarget(state: PresentationState, target: Pres
     .sort((a, b) => (a.entry.zIndex ?? a.entry.priority) - (b.entry.zIndex ?? b.entry.priority) || a.entry.layer.localeCompare(b.entry.layer) || a.entry.instanceId.localeCompare(b.entry.instanceId));
 }
 
+export function resolvePresentationSurface(state: PresentationState, surface: PresentationSurface, profile: ViewerProfile, definitions: readonly PresentationLayoutDefinition[] = []): ResolvedPresentationInstance[] {
+  return PRESENTATION_REGIONS.flatMap((region) => resolvePresentationRegion(state, region)).map((entry) => resolvePresentationInstance(entry, profile, definitions)).filter((instance) => instance.placement.surface === surface).sort((a, b) => (a.entry.zIndex ?? a.entry.priority) - (b.entry.zIndex ?? b.entry.priority));
+}
+
 function targetMatches(instance: ResolvedPresentationInstance, target: PresentationRegionName, profile: ViewerProfile): boolean {
   if (instance.placement.surface === "video") return target === "video.overlay";
   if (instance.placement.surface === "companion") return false;
