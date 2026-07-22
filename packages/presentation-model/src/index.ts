@@ -47,6 +47,11 @@ export type PresentationItem =
       brand: string;
       tagline?: string;
       accent?: string;
+    }
+  | {
+      kind: "clock";
+      label?: string;
+      time: string;
     };
 
 export interface PresentationActivation {
@@ -128,6 +133,36 @@ export function createV1PresentationBaseline(): PresentationState {
     { action: "activate", eventId: "baseline-left-rail", targetPts: 0, region: "left.rail", layer: "primary", item: { kind: "sponsor-panel", brand: "ShowGather", tagline: "Bring every part of the show together." } },
     { action: "activate", eventId: "baseline-right-rail", targetPts: 0, region: "right.rail", layer: "primary", item: { kind: "sponsor-panel", brand: "Partner Space", tagline: "Timed sponsor takeover ready." } },
     { action: "activate", eventId: "baseline-footer", targetPts: 0, region: "footer", layer: "ticker", item: { kind: "ticker", label: "LIVE", text: "HLS media time is the presentation authority • timed metadata pipeline connected • V1 surround-player preview" } },
+  ];
+  for (const command of commands) state = applyPresentationCommand(state, command);
+  return state;
+}
+
+/**
+ * A local, transport-free renderer acceptance scene. It deliberately models
+ * the same instances across all output profiles rather than duplicating their
+ * content for desktop, TV and mobile.
+ */
+export function createV13PresentationAcceptanceScene(): PresentationState {
+  let state = createPresentationState();
+  const commands: PresentationActivation[] = [
+    { action: "activate", eventId: "scene-scorebug", targetPts: 0, region: "video.overlay", layer: "scorebug", instanceId: "scorebug-main", zIndex: 10, item: { kind: "scorebug", homeTeam: "ENG", homeScore: "2", awayTeam: "FRA", awayScore: "1", clock: "78:42" } },
+    { action: "activate", eventId: "scene-clock", targetPts: 0, region: "video.overlay", layer: "clock", instanceId: "programme-clock", zIndex: 20, item: { kind: "clock", label: "LIVE", time: "78:42" } },
+    { action: "activate", eventId: "scene-presenter-a", targetPts: 0, region: "video.overlay", layer: "lower-third", instanceId: "lower-third-presenter-a", zIndex: 30, item: { kind: "lower-third", title: "ALEX MORGAN", subtitle: "Presenter" }, placementByProfile: {
+      desktop: { surface: "video", anchor: "bottom-left", x: .04, y: .06, width: .4, safeArea: true, layout: "column" },
+      tv: { surface: "video", anchor: "bottom-left", x: .04, y: .06, width: .44, safeArea: true, layout: "column" },
+      mobile: { surface: "video", anchor: "bottom-centre", x: 0, y: .18, width: .9, safeArea: true, layout: "column" },
+    } },
+    { action: "activate", eventId: "scene-presenter-b", targetPts: 0, region: "video.overlay", layer: "lower-third", instanceId: "lower-third-presenter-b", zIndex: 31, item: { kind: "lower-third", title: "JORDAN LEE", subtitle: "Co-commentator" }, placementByProfile: {
+      desktop: { surface: "video", anchor: "bottom-right", x: .04, y: .06, width: .4, safeArea: true, layout: "column" },
+      tv: { surface: "video", anchor: "bottom-right", x: .04, y: .06, width: .44, safeArea: true, layout: "column" },
+      mobile: { surface: "video", anchor: "bottom-centre", x: 0, y: .05, width: .9, safeArea: true, layout: "column" },
+    } },
+    { action: "activate", eventId: "scene-sponsor", targetPts: 0, region: "right.rail", layer: "sponsor", instanceId: "sponsor-top-right", zIndex: 15, item: { kind: "sponsor-panel", brand: "NORTHSTAR", tagline: "Official broadcast partner" }, placementByProfile: {
+      desktop: { surface: "surround", anchor: "top-right", x: 0, y: 0, width: 1, layout: "single" },
+      tv: { surface: "video", anchor: "top-right", x: .04, y: .04, width: .22, safeArea: true, layout: "overlay" },
+      mobile: { surface: "companion", anchor: "centre", x: 0, y: 0, width: .94, layout: "column" },
+    } },
   ];
   for (const command of commands) state = applyPresentationCommand(state, command);
   return state;

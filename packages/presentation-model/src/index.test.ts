@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import {
   applyPresentationCommand,
+  createV13PresentationAcceptanceScene,
   createPresentationState,
   expirePresentationItems,
   normalisePlacement,
@@ -108,4 +109,16 @@ test("placement presets produce normalised title-safe transforms", () => {
   const placement = placementFromPreset("video", "bottom-left", { x: -2, y: 2, width: 2 });
   assert.deepEqual(placement, { surface: "video", anchor: "bottom-left", x: 0.04, y: 0.96, width: 0.92, safeArea: true, layout: "column" });
   assert.equal(normalisePlacement({ surface: "video", anchor: "top-left", x: Number.NaN, y: 0, width: 0 }).width, 0.08);
+});
+
+test("the shared acceptance scene resolves the same instances for every profile", () => {
+  const state = createV13PresentationAcceptanceScene();
+  const desktopVideo = resolvePresentationTarget(state, "video.overlay", "desktop");
+  const tvVideo = resolvePresentationTarget(state, "video.overlay", "tv");
+  const mobileVideo = resolvePresentationTarget(state, "video.overlay", "mobile");
+
+  assert.deepEqual(desktopVideo.map((instance) => instance.entry.instanceId), ["scorebug-main", "programme-clock", "lower-third-presenter-a", "lower-third-presenter-b"]);
+  assert.equal(resolvePresentationTarget(state, "right.rail", "desktop")[0]?.entry.instanceId, "sponsor-top-right");
+  assert.equal(tvVideo.some((instance) => instance.entry.instanceId === "sponsor-top-right"), true);
+  assert.deepEqual(mobileVideo.filter((instance) => instance.entry.item.kind === "lower-third").map((instance) => instance.placement.y), [.18, .05]);
 });

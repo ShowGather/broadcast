@@ -22,6 +22,7 @@ function Graphic({ instance }: { instance: ResolvedPresentationInstance }) {
     case "ticker": return <div className={className} style={style}>{item.label && <b>{item.label}</b>}<span>{item.text}</span></div>;
     case "alert": return <div className={`${className} graphic--alert-${item.severity}`} style={style}><b>{item.title}</b><span>{item.message}</span></div>;
     case "sponsor-panel": return <div className={className} style={{ ...style, ...(item.accent ? { borderColor: item.accent } : {}) }}><b>{item.brand}</b>{item.tagline && <span>{item.tagline}</span>}</div>;
+    case "clock": return <div className={className} style={style}>{item.label && <b>{item.label}</b>}<time>{item.time}</time></div>;
   }
 }
 

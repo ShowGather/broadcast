@@ -110,6 +110,7 @@ function defaultPlacement(item: PresentationItem, region: PresentationRegionName
     case "scorebug": return placementFromPreset("video", "top-left", { width: profile === "mobile" ? 0.34 : 0.28 });
     case "lower-third": return placementFromPreset("video", profile === "mobile" ? "bottom-centre" : "bottom-left", { width: profile === "mobile" ? 0.9 : profile === "tv" ? 0.44 : 0.4 });
     case "alert": return placementFromPreset("video", "centre", { width: profile === "mobile" ? 0.88 : 0.48 });
+    case "clock": return placementFromPreset("video", "top-centre", { width: profile === "mobile" ? 0.24 : 0.18 });
     case "sponsor-panel": return profile === "tv"
       ? placementFromPreset("video", "top-right", { width: 0.22 })
       : profile === "mobile"
@@ -127,5 +128,6 @@ function defaultVariant(item: PresentationItem, profile: ViewerProfile): string 
   if (item.kind === "scorebug") return profile === "mobile" ? "compact" : profile === "tv" ? "broadcast" : "standard";
   if (item.kind === "lower-third") return profile === "mobile" ? "compact" : profile === "tv" ? "broadcast" : "wide";
   if (item.kind === "ticker") return profile === "mobile" ? "headline" : profile === "tv" ? "broadcast" : "crawl";
+  if (item.kind === "clock") return profile === "mobile" ? "compact" : "standard";
   return "standard";
 }

@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState, type CSSProperties } from "react";
 import type { ShowGatherEvent } from "@showgather/event-schema";
-import type { PresentationSnapshot } from "@showgather/presentation-model";
+import { createV13PresentationAcceptanceScene, type PresentationSnapshot } from "@showgather/presentation-model";
 import { useSyncClient } from "./useSyncClient";
 import { PresentationProvider, usePresentation } from "./presentation/PresentationProvider";
 import { PresentationRegion } from "./presentation/PresentationRegion";
@@ -43,6 +43,7 @@ function ViewerExperience() {
   const rehearsal = search.get("rehearsal") === "1";
   const embedded = search.get("embedded") === "1";
   const diagnosticsEnabled = search.get("diagnostics") === "1";
+  const acceptanceScene = search.get("scene") === "acceptance";
   const productionId = search.get("productionId");
   const channelId = window.location.pathname.match(/^\/player\/([^/]+)/)?.[1];
   const [viewerContext, setViewerContext] = useState<ViewerContext>(defaultViewerContext);
@@ -57,11 +58,12 @@ function ViewerExperience() {
   }, [replaceState]);
   useEffect(() => {
     let active = true;
+    if (acceptanceScene) return () => { active = false; };
     hydrateSnapshot()
       .then(() => { if (!active) return; })
       .catch(() => { /* The baseline remains available if the API is temporarily unreachable. */ });
     return () => { active = false; };
-  }, [hydrateSnapshot]);
+  }, [acceptanceScene, hydrateSnapshot]);
   useEffect(() => {
     if (!productionId) return;
     fetch(`/api/productions/${encodeURIComponent(productionId)}`)
@@ -119,5 +121,6 @@ function ViewerExperience() {
 }
 
 export default function App() {
-  return <PresentationProvider initialState={createDemoPresentationState()}><ViewerExperience /></PresentationProvider>;
+  const acceptanceScene = new URLSearchParams(window.location.search).get("scene") === "acceptance";
+  return <PresentationProvider initialState={acceptanceScene ? createV13PresentationAcceptanceScene() : createDemoPresentationState()}><ViewerExperience /></PresentationProvider>;
 }
