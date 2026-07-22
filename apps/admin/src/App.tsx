@@ -51,7 +51,7 @@ export default function App() {
   const [runReady, setRunReady] = useState(false);
   const [runCueIndex, setRunCueIndex] = useState(0);
   const [previewProfile, setPreviewProfile] = useState<"desktop" | "mobile" | "tv">("desktop");
-  const [confirmation, setConfirmation] = useState<"complete" | "abandon" | "reset" | null>(null);
+  const [confirmation, setConfirmation] = useState<"complete" | "abandon" | "reset" | "safe-clear" | null>(null);
   const [diagnosticsOpen, setDiagnosticsOpen] = useState(false);
   const confirmationButton = useRef<HTMLButtonElement>(null);
   const [channels, setChannels] = useState<Channel[]>([]);
@@ -297,7 +297,9 @@ export default function App() {
   };
   const confirmSessionAction = async () => {
     if (!confirmation) return;
-    if (confirmation === "reset") {
+    if (confirmation === "safe-clear") {
+      await send({ action: "safe-clear" }, "Safe Clear sent");
+    } else if (confirmation === "reset") {
       const result = await mutate(`/api/rundown/live/sessions?rundownId=${encodeURIComponent(rundownId)}`, "POST", {}, "New live session started", fetchRundown);
       if (result) setRunReady(true);
     } else if (sessionId) {
@@ -447,12 +449,12 @@ export default function App() {
     {workspace === "run" && runReady && <section className="section run-console" aria-label="Live cue control">
       <div className="run-console__cue"><span className="run-console__eyebrow">Current cue</span><h2>{runCue?.label ?? "No enabled cue remaining"}</h2><p>{runCue ? `${runCue.order}. ${runCue.status}` : "The rundown is complete or has no enabled cues."}</p></div>
       <div className="run-console__next"><span>Next</span><strong>{nextRunCue?.label ?? "—"}</strong></div>
-      <div className="run-console__actions"><button disabled={runCueIndex === 0} onClick={() => setRunCueIndex((index) => Math.max(0, index - 1))}>Previous</button><button className="run-console__go" disabled={!runCue || !runCue.enabled || runCue.status === "active" || runCue.status === "cancelled"} onClick={() => { if (runCue) goCue(runCue); }}>{runCue?.status === "failed" ? "Retry cue" : "GO"}</button><button className="safe-clear" onClick={() => send({ action: "safe-clear" }, "Safe Clear sent")}>Safe Clear</button></div>
+      <div className="run-console__actions"><button disabled={runCueIndex === 0} onClick={() => setRunCueIndex((index) => Math.max(0, index - 1))}>Previous</button><button className="run-console__go" disabled={!runCue || !runCue.enabled || runCue.status === "active" || runCue.status === "cancelled"} onClick={() => { if (runCue) goCue(runCue); }}>{runCue?.status === "failed" ? "Retry cue" : "GO"}</button><button className="safe-clear" onClick={() => setConfirmation("safe-clear")}>Safe Clear</button></div>
       <div className="run-console__list" aria-label="Rundown cue navigation">{rundown.map((cue, index) => <button key={cue.id} className={index === runCueIndex ? "active" : ""} disabled={!cue.enabled} onClick={() => setRunCueIndex(index)}>{cue.order}. {cue.label}<span>{cue.status}</span></button>)}</div>
       <div className="run-console__session-actions"><button onClick={() => setConfirmation("complete")}>Complete show</button><button onClick={() => setConfirmation("abandon")}>Abandon session</button><button onClick={() => setConfirmation("reset")}>Reset live session</button></div>
     </section>}
 
-    {confirmation && <div className="confirmation-backdrop" role="presentation"><section className="confirmation-dialog" role="alertdialog" aria-modal="true" aria-labelledby="confirmation-title" aria-describedby="confirmation-description"><h2 id="confirmation-title">{confirmation === "complete" ? "Complete this live show?" : confirmation === "abandon" ? "Abandon this live session?" : "Start a new live session?"}</h2><p id="confirmation-description">{confirmation === "complete" ? "The current session will be marked complete. Programme presentation is not cleared automatically." : confirmation === "abandon" ? "The current session will be recorded as abandoned. Programme presentation is not cleared automatically." : "The current live session will be completed and a fresh immutable rundown session will begin."}</p><div><button onClick={() => setConfirmation(null)}>Cancel</button><button ref={confirmationButton} className="danger" onClick={confirmSessionAction}>Confirm</button></div></section></div>}
+    {confirmation && <div className="confirmation-backdrop" role="presentation"><section className="confirmation-dialog" role="alertdialog" aria-modal="true" aria-labelledby="confirmation-title" aria-describedby="confirmation-description"><h2 id="confirmation-title">{confirmation === "complete" ? "Complete this live show?" : confirmation === "abandon" ? "Abandon this live session?" : confirmation === "safe-clear" ? "Confirm Safe Clear?" : "Start a new live session?"}</h2><p id="confirmation-description">{confirmation === "complete" ? "The current session will be marked complete. Programme presentation is not cleared automatically." : confirmation === "abandon" ? "The current session will be recorded as abandoned. Programme presentation is not cleared automatically." : confirmation === "safe-clear" ? "Safe Clear removes active presentation graphics. Programme video will continue uninterrupted." : "The current live session will be completed and a fresh immutable rundown session will begin."}</p><div><button onClick={() => setConfirmation(null)}>Cancel</button><button ref={confirmationButton} className="danger" onClick={confirmSessionAction}>{confirmation === "safe-clear" ? "Confirm Safe Clear" : "Confirm"}</button></div></section></div>}
 
     {workspace === "rehearse" && <section className="section rehearsal-console">
       <h2>Rehearsal rundown</h2>
