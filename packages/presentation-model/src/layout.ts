@@ -45,6 +45,7 @@ export interface ResolvedPresentationInstance {
   placement: ProfilePlacement;
   variant: string;
   transition: PresentationTransition;
+  stackIndex: number;
 }
 
 export const PRESENTATION_PRESETS: Record<PresentationAnchor, Omit<ProfilePlacement, "surface">> = {
@@ -90,6 +91,7 @@ export function resolvePresentationInstance(entry: PresentationEntry, profile: V
     placement: normalisePlacement(placement),
     variant: entry.variantByProfile?.[profile] ?? definition?.variantByProfile?.[profile] ?? defaultVariant(entry.item, profile),
     transition: entry.transition ?? defaultTransition,
+    stackIndex: 0,
   };
 }
 
@@ -99,11 +101,18 @@ export function resolvePresentationInstance(entry: PresentationEntry, profile: V
  * changing the command or stored content.
  */
 export function resolvePresentationTarget(state: PresentationState, target: PresentationRegionName, profile: ViewerProfile, definitions: readonly PresentationLayoutDefinition[] = []): ResolvedPresentationInstance[] {
-  return PRESENTATION_REGIONS
+  const instances = PRESENTATION_REGIONS
     .flatMap((region) => resolvePresentationRegion(state, region))
     .map((entry) => resolvePresentationInstance(entry, profile, definitions))
     .filter((instance) => targetMatches(instance, target, profile))
     .sort((a, b) => (a.entry.zIndex ?? a.entry.priority) - (b.entry.zIndex ?? b.entry.priority) || a.entry.layer.localeCompare(b.entry.layer) || a.entry.instanceId.localeCompare(b.entry.instanceId));
+  const stacks = new Map<string, number>();
+  return instances.map((instance) => {
+    const key = `${instance.placement.surface}:${instance.placement.anchor}:${instance.placement.layout}`;
+    const stackIndex = instance.placement.layout === "column" ? (stacks.get(key) ?? 0) : 0;
+    stacks.set(key, stackIndex + 1);
+    return { ...instance, stackIndex };
+  });
 }
 
 export function resolvePresentationSurface(state: PresentationState, surface: PresentationSurface, profile: ViewerProfile, definitions: readonly PresentationLayoutDefinition[] = []): ResolvedPresentationInstance[] {

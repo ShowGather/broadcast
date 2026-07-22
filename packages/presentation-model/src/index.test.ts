@@ -130,3 +130,9 @@ test("persisted layout definitions override placement without changing active st
   assert.equal(scorebug?.placement.anchor, "bottom-right");
   assert.equal(configured.length, resolvePresentationTarget(state, "video.overlay", "tv").length);
 });
+
+test("column placements stack deterministically while overlay placements retain z-order", () => {
+  let state = createPresentationState();
+  for (const id of ["a", "b"]) state = applyPresentationCommand(state, { action: "activate", eventId: id, targetPts: 1, region: "video.overlay", layer: "lower", instanceId: id, item: { kind: "lower-third", title: id }, placementByProfile: { desktop: { surface: "video", anchor: "bottom-left", x: .04, y: .04, width: .4, safeArea: true, layout: "column" } } });
+  assert.deepEqual(resolvePresentationTarget(state, "video.overlay", "desktop").map((item) => item.stackIndex), [0, 1]);
+});

@@ -34,13 +34,14 @@ function placementStyle(instance: ResolvedPresentationInstance): CSSProperties {
   const vertical = placement.anchor.startsWith("top") ? { top: y } : placement.anchor.startsWith("bottom") ? { bottom: y } : { top: `calc(50% + ${y})` };
   const translateX = placement.anchor.endsWith("centre") ? "-50%" : "0";
   const translateY = placement.anchor.startsWith("centre") ? "-50%" : "0";
+  const stackOffset = placement.layout === "column" ? instance.stackIndex * (placement.anchor.startsWith("bottom") ? -112 : 112) : 0;
   return {
     ...horizontal,
     ...vertical,
     width: `${placement.width * 100}%`,
     ...(placement.height === undefined ? {} : { height: `${placement.height * 100}%` }),
     ...(placement.opacity === undefined ? {} : { opacity: placement.opacity }),
-    transform: `translate(${translateX}, ${translateY}) rotate(${placement.rotation ?? 0}deg)`,
+    transform: `translate(${translateX}, calc(${translateY} + ${stackOffset}%)) rotate(${placement.rotation ?? 0}deg)`,
     zIndex: instance.entry.zIndex ?? instance.entry.priority,
     transitionDuration: `${instance.transition.durationMs}ms`,
   };
