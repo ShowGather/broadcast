@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { adminPath, parseAdminRoute, type AdminRoute } from "./routing.js";
+import { adminPath, parseAdminRoute, type AdminRoute, type PrepareTab } from "./routing.js";
 
 interface StoredEvent {
   event: { id: string; t: string; p: Record<string, unknown> };
@@ -31,7 +31,7 @@ function eventLabel(event: StoredEvent["event"]) {
 }
 
 export default function App() {
-  const [route, setRoute] = useState<AdminRoute>(() => parseAdminRoute(window.location.pathname));
+  const [route, setRoute] = useState<AdminRoute>(() => parseAdminRoute(window.location.pathname, window.location.search));
   const [events, setEvents] = useState<StoredEvent[]>([]);
   const [title, setTitle] = useState("");
   const [message, setMessage] = useState("");
@@ -95,7 +95,7 @@ export default function App() {
   }, []);
 
   useEffect(() => {
-    const onPopState = () => setRoute(parseAdminRoute(window.location.pathname));
+    const onPopState = () => setRoute(parseAdminRoute(window.location.pathname, window.location.search));
     window.addEventListener("popstate", onPopState);
     if (route.workspace === "productions" && window.location.pathname !== "/admin/productions") navigate({ workspace: "productions" }, true);
     return () => window.removeEventListener("popstate", onPopState);
@@ -333,6 +333,8 @@ export default function App() {
       <button className={route.workspace === "productions" ? "active" : ""} onClick={() => navigate({ workspace: "productions" })}>Productions</button>
       {(["prepare", "rehearse", "run"] as const).map((item) => <button key={item} disabled={!productionId} className={workspace === item ? "active" : ""} onClick={() => navigate({ workspace: item, productionId })}>{item}</button>)}
     </nav>
+
+    {workspace === "prepare" && <nav className="prepare-tabs" aria-label="Prepare workspace sections">{(["overview", "rundown", "viewer", "configuration"] as PrepareTab[]).map((tab) => <button key={tab} className={(route.prepareTab ?? "overview") === tab ? "active" : ""} onClick={() => navigate({ workspace: "prepare", productionId, prepareTab: tab })}>{tab === "configuration" ? "Show configuration" : tab}</button>)}</nav>}
 
     <section className="section admin-context">
       <h2>{route.workspace === "productions" ? "Choose a production" : `${workspace} · ${selectedProduction?.title ?? "Loading production"}`}</h2>
