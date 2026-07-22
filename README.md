@@ -1,209 +1,111 @@
-# ShowGather Broadcast — Proof of Concept
+# ShowGather V1 — Interactive Broadcast Pilot
 
-A minimal end-to-end pipeline proving that timed ID3 metadata injected into an HLS live stream can trigger synchronized overlays in a web browser, rendered at the correct media playback time.
+ShowGather synchronises cue-driven graphics and surrounding web experiences with live HLS playback using timed metadata and media presentation timestamps (PTS).
+
+This is a **V1 pilot release candidate built on a verified timed-metadata proof of concept**. It is demonstrable locally, not a production deployment.
+
+## What V1 does
+
+- Desktop surround regions, mobile companion panels, and a TV profile around a live HLS player.
+- Direct configurable presentation commands and a focused operator rundown.
+- Score, lower third, alert, sponsor takeover, ticker, and regional clear commands.
+- Live ID3 transport plus a development-only rehearsal SSE path.
+- Revisioned durable snapshots for late joins/reconnects; transient graphics remain tied to media PTS.
 
 ## Architecture
 
-```
-FFmpeg test source
-  → id3injector
-  → ShowGather packet-preserving TS segmenter
-  → rolling HLS segments
-  → nginx
-  → hls.js
-  → media-timeline sync client
-  → overlay
+```text
+Operator rundown or direct control
+  → canonical presentation command
+  → compact `pc` timed transport envelope
+  → live ID3 / MPEG-TS / HLS, or rehearsal SSE
+  → media-PTS scheduler
+  → shared presentation state
+  → video overlay and surrounding viewer regions
 ```
 
-## Quick Start
+| Area | Responsibility |
+| --- | --- |
+| `apps/admin` | Operator controls and rundown |
+| `apps/player` | HLS playback, PTS scheduling, viewer rendering |
+| `packages/event-schema` | Compact transport validation |
+| `packages/id3` | TPE1 encode/decode |
+| `packages/presentation-model` | Transport-independent presentation state |
+| `services/api` | Commands, revisions, snapshots, injection |
+| `services/ts-segmenter` | Packet-preserving HLS segments |
 
-### Local Development
+## Pilot quick start
+
+Prerequisites: Docker Desktop or OrbStack, Node 20+, and pnpm 10+.
 
 ```bash
-# 1. Install dependencies
 pnpm install
-
-# 2. Build shared packages
-pnpm --filter @showgather/event-schema build
-pnpm --filter @showgather/id3 build
-
-# 3. Start the stream pipeline (FFmpeg → id3injector → HLS)
-pnpm stream
-
-# 4. In another terminal — serve HLS files
-cd stream/hls && python3 -m http.server 8000
-
-# 5. In another terminal — start the API
-cd services/api && npx tsx src/server.ts
-
-# 6. In another terminal — start the admin UI
-cd apps/admin && npx vite --port 3002
-
-# 7. In another terminal — start the player
-cd apps/player && npx vite --port 3003
-```
-
-### Docker Compose
-
-```bash
-cd deploy/compose
-docker compose up --build
-```
-
-### Pilot demonstration (recommended)
-
-```bash
 pnpm pilot:up
 ```
 
-This starts the complete local Compose stack in the background. See [docs/Pilot Demonstration Runbook.md](docs/Pilot%20Demonstration%20Runbook.md) for the repeatable rundown, rehearsal flow, and manual checks.
+Allow roughly a minute for stream health and services. Open:
 
-## URLs
+- Admin: `http://localhost:3002`
+- Desktop: `http://localhost:3003`
+- Mobile companion: `http://localhost:3003/?profile=mobile`
+- TV: `http://localhost:3003/?profile=tv`
+- API health: `http://localhost:3001/api/health`
 
-| Service | URL |
-|---------|-----|
-| Admin interface | http://localhost:3002 |
-| Public player | http://localhost:3003 |
-| HLS playlist | http://localhost:8000/hls/stream.m3u8 |
-| API health | http://localhost:3001/api/health |
-| Measurements | http://localhost:3001/api/measurements |
-| id3injector API | http://localhost:8080/inject |
-
-## Verification
-
-### Check HLS segments for timed ID3
+See [Pilot Demonstration Runbook](docs/Pilot%20Demonstration%20Runbook.md) for the repeatable rundown, rehearsal flow, recovery checks, logs, reset procedure, and screenshots.
 
 ```bash
-bash stream/scripts/verify-segments.sh
+pnpm pilot:down
 ```
 
-This inspects the latest `.ts` segment and confirms:
-- A data stream exists (stream type 0x15)
-- The codec is `timed_id3`
-- The stream is present in the segment
+## Event and presentation model
 
-### Manual ffprobe check
+```text
+Canonical presentation command
+  ↓
+compact `pc` transport envelope
+  ↓
+ID3 TPE1 reference adapter
+```
+
+The command model is not defined by ID3: timed ID3 is one V1 delivery adapter. The compact `pc` envelope is byte-bounded for the current 127-byte TPE1 limit.
+
+## Timing, recovery, and seek policy
+
+- **Pause:** presentation progression pauses with media time.
+- **Seek forward:** passed transient cues are discarded; future cues remain queued.
+- **Seek backward:** previously seen cue IDs are not replayed in the same session.
+- **Late join/reconnect:** durable state arrives through a revisioned snapshot; future/transient changes arrive through timed metadata.
+- **Transient graphics:** are not replayed from snapshots.
+
+The canonical policy is [Pause, Seek, and Reload Behaviour](docs/pause-seek-behaviour.md).
+
+## Technical foundation: timed ID3 reference transport
+
+```text
+Admin action → API → ID3 injection → MPEG-TS
+→ packet-preserving segmenter → HLS → hls.js metadata → PTS scheduler
+```
+
+The custom TS segmenter preserves timed-ID3 packets where normal FFmpeg remuxing did not. The 127-byte TPE1 constraint is a deliberate V1 reference-adapter limitation; future adapters may use compact binary payloads, references, or CMAF `emsg`.
+
+## Verification and development
 
 ```bash
-ffprobe -v quiet -show_streams -select_streams d:0 stream/hls/stream0.ts
+pnpm build
+pnpm typecheck
+pnpm verify
 ```
 
-### Inject a test event via API
+CI reproduces builds, TypeScript tests, and TS-segmenter Go tests. Browser/HLS timing remains a documented Safari pilot acceptance test.
 
-```bash
-curl -X POST http://localhost:3001/api/events \
-  -H "Content-Type: application/json" \
-  -d '{"title":"Test Overlay","message":"Hello from ShowGather","durationMs":5000}'
-```
+## Known V1 limitations
 
-### Inject directly via id3injector
+- Shows, rundown state, snapshots, and audit history are in-memory only.
+- No accounts, authentication, roles, or multi-operator collaboration.
+- No asset/template library or general plugin system.
+- Compose is local demonstration infrastructure, not production packaging, CDN delivery, or observability.
+- No production analytics/telemetry or broad browser/platform support guarantee.
 
-```bash
-curl -X POST http://localhost:8080/inject \
-  -H "Content-Type: application/json" \
-  -d '{"text":"Direct injection test"}'
-```
+## Contributing and security
 
-## Event Format
-
-Events are compact JSON encoded as ID3v2.4 TPE1 frames (max 127 bytes):
-
-```json
-{
-  "v": 1,
-  "id": "evt-abc12345",
-  "t": "overlay.show",
-  "p": {
-    "title": "Goal!",
-    "msg": "Home team scores",
-    "dur": 5000
-  }
-}
-```
-
-| Field | Description |
-|-------|-------------|
-| `v` | Schema version (always 1) |
-| `id` | Unique event ID for deduplication |
-| `t` | Event type (`overlay.show`) |
-| `p.title` | Display title |
-| `p.msg` | Optional message body |
-| `p.dur` | Duration in milliseconds before auto-hide |
-
-## Sync Pipeline Details
-
-1. **Admin triggers overlay** → POST /api/events
-2. **API validates and encodes** → ShowGatherEvent → JSON → ID3v2.4 TPE1 frame → base64
-3. **API injects** → POST to id3injector with `{"id3_base64":"..."}`
-4. **id3injector inserts a timed-ID3 PES packet** → the payload remains intact for downstream transport
-5. **ShowGather TS segmenter** → copies the original 188-byte MPEG-TS packets into rolling HLS segments without demuxing or remuxing, preserving the complete timed-ID3 payload byte-for-byte.
-6. **hls.js receives** → `FRAG_PARSING_METADATA` event fires with `sample.data` (raw ID3 tag bytes)
-7. **Client decodes** → `decodeTpe1Text(sample.data)` → JSON string → `validateEvent()`
-8. **Client queues** → event stored with `metadataPts = sample.pts`
-9. **rAF loop** → when `video.currentTime >= metadataPts`, overlay is rendered
-10. **Auto-hide** → after `event.p.dur` ms, overlay is removed
-
-## Pause/Seek/Reload Rules
-
-See [docs/pause-seek-behaviour.md](docs/pause-seek-behaviour.md) for the complete specification.
-
-**Summary:**
-- **Pause**: Events naturally freeze (video.currentTime stops advancing)
-- **Seek forward**: Missed events fire immediately; future events remain queued
-- **Seek backward**: Already-fired events are not replayed (dedup by ID)
-- **Reload**: New session — events may replay from re-downloaded fragments
-
-## Acceptance Criteria
-
-| # | Criterion | Status |
-|---|-----------|--------|
-| 1 | `docker compose up --build` starts the system | Verified locally |
-| 2 | Public player plays the HLS stream | Verified (hls.js + HLS endpoint) |
-| 3 | Admin page injects overlay events | Verified (POST /api/events) |
-| 4 | Event is present as timed ID3 in .ts segment | **Verified** (ffprobe confirms 0x15) |
-| 5 | hls.js receives via FRAG_PARSING_METADATA | Verified in the running POC |
-| 6 | Client queues by PTS | Verified in the running POC (useSyncClient.ts) |
-| 7 | Overlay renders at video.currentTime PTS | Verified in the running POC |
-| 8 | Overlay hides after durationMs | Verified in the running POC |
-| 9 | Duplicate events ignored | Verified in the running POC |
-| 10 | Timing measured and reported to API | Verified in the running POC |
-| 11 | Pause/seek follows documented rules | Documented + verified in the running POC |
-| 12 | README explains run/verify steps | This file |
-
-## What Was Verified Locally
-
-- id3injector successfully inserts a complete timed-ID3 PES packet
-- FFmpeg demux/remux was found to remove the outer ID3v2 header and is therefore not used for HLS packaging in this proof of concept.
-- The ShowGather packet-preserving TS segmenter preserves the complete ID3 tag and metadata PID.
-- hls.js receives the metadata through `FRAG_PARSING_METADATA`
-- The client queues the event by PTS and renders the overlay against `video.currentTime`
-
-## Known POC Limitations
-
-### 127-byte TPE1 payload limit
-
-Events are encoded as ID3v2.4 TPE1 text frames, which have a maximum payload of **127 bytes**. The current compact event format fits:
-
-```json
-{"v":1,"id":"evt-abc123","t":"overlay.show","p":{"title":"Goal!","msg":"Home team scores","dur":5000}}
-```
-
-This is approximately 104 bytes. Richer events (longer titles, multiple fields) will exceed this limit. Future approaches: CBOR encoding, event-ID-only transport with cached payloads, or CMAF `emsg` for fMP4.
-
-### No burned-in timecode
-
-FFmpeg's `drawtext` filter is unavailable in this build (no libfreetype). The test card shows no timecode overlay, making visual timing assessment harder. The sync log panel and measurements API serve this purpose instead.
-
-## Tech Stack
-
-| Component | Technology |
-|-----------|-----------|
-| Event schema | TypeScript + JSON Schema validation |
-| ID3 encode/decode | Custom TPE1 frame builder/parser |
-| Backend API | Fastify (Node.js) |
-| Admin UI | React + Vite |
-| Player | React + Vite + hls.js |
-| Stream source | FFmpeg (testsrc2 + sine tone) |
-| Metadata injector | id3injector (Go) |
-| HLS packaging | ShowGather packet-preserving TS segmenter |
-| HLS serving | Python http.server (local) / nginx (Docker) |
+A licence, contributor guide, and security policy require an explicit product/governance decision before external contributions are invited.

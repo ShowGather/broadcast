@@ -4,6 +4,8 @@
 
 From `broadcast/`:
 
+Prerequisites: Docker Desktop or OrbStack, Node 20+, and pnpm 10+.
+
 ```bash
 pnpm pilot:up
 ```
@@ -17,6 +19,21 @@ Wait for `http://localhost:3001/api/health` to return `status: ok`, then open:
 - Rehearsal mobile viewer: `http://localhost:3003/?profile=mobile&rehearsal=1`
 
 Stop the local stack with `pnpm pilot:down`.
+
+If startup takes longer than a minute, inspect service state and logs:
+
+```bash
+docker compose -f deploy/compose/docker-compose.yml ps
+docker compose -f deploy/compose/docker-compose.yml logs --tail=100 api stream player admin
+```
+
+To reset the local pilot completely, including the HLS volume, run the following destructive local-only command:
+
+```bash
+docker compose -f deploy/compose/docker-compose.yml down -v
+```
+
+The browser acceptance evidence was captured with Safari Technology Preview on 22 July 2026.
 
 ## Repeatable live demonstration
 
