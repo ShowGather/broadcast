@@ -47,7 +47,14 @@ export async function catalogRoutes(app: FastifyInstance) {
     catch (error) { return reply.status(409).send({ error: error instanceof Error ? error.message : "unable to retry command" }); }
   });
   app.post<{ Params: { channelId: string; outboxId: string } }>("/channels/:channelId/presentation/outbox/:outboxId/cancel", async (request, reply) => {
-    try { return reply.status(200).send(await requireStore().cancel(request.params.channelId, request.params.outboxId)); }
+    try {
+      const result = await requireStore().cancel(request.params.channelId, request.params.outboxId);
+      const outbox = await prisma.presentationOutbox.findUnique({ where: { id: request.params.outboxId }, include: { command: true } });
+      if (result.status === "cancelled" && outbox?.command.executionId) {
+        await prisma.rundownCueExecution.updateMany({ where: { executionId: outbox.command.executionId }, data: { status: "cancelled", executedAt: new Date(), error: null } });
+      }
+      return reply.status(200).send(result);
+    }
     catch (error) { return reply.status(409).send({ error: error instanceof Error ? error.message : "unable to cancel command" }); }
   });
 }

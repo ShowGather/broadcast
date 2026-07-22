@@ -4,7 +4,7 @@ interface StoredEvent {
   event: { id: string; t: string; p: Record<string, unknown> };
   injectedAt: string;
 }
-interface RundownCue { id: string; label: string; order: number; status: "pending" | "active" | "complete"; executionId?: string; }
+interface RundownCue { id: string; label: string; order: number; status: "pending" | "active" | "complete" | "failed" | "cancelled"; executionId?: string; }
 interface Channel { id: string; name: string; slug: string; status: string; }
 interface Production { id: string; title: string; status: string; }
 interface Rundown { id: string; name: string; version: number; }
@@ -179,7 +179,7 @@ export default function App() {
       <h2>Rundown — {rehearsal ? "Rehearsal" : "Live"}</h2>
       <p className="hint">GO uses an idempotent execution ID. Completed cues require explicit re-run; rehearsal state is separate from live.</p>
       <div className="cue-grid">
-        {rundown.map((cue) => <div key={cue.id}><strong>{cue.order}. {cue.label}</strong><span className="hint"> {cue.status}</span><button disabled={cue.status === "active"} onClick={() => goCue(cue)}>GO</button>{cue.status === "complete" && <button onClick={() => goCue(cue, true)}>Re-run</button>}</div>)}
+        {rundown.map((cue) => <div key={cue.id}><strong>{cue.order}. {cue.label}</strong><span className="hint"> {cue.status}</span><button disabled={cue.status === "active" || cue.status === "cancelled"} onClick={() => goCue(cue)}>{cue.status === "failed" ? "Retry" : "GO"}</button>{cue.status === "complete" && <button onClick={() => goCue(cue, true)}>Re-run</button>}</div>)}
       </div>
     </section>
 

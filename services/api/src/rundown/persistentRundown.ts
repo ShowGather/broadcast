@@ -1,10 +1,10 @@
 import type { PrismaClient } from "@prisma/client";
 import type { PresentationCommandPayload, ShowGatherEvent } from "@showgather/event-schema";
-import { createEvent, dispatchLiveEvent } from "../routes/events.js";
+import { createEvent, dispatchLiveEvent, retryLiveEvent } from "../routes/events.js";
 import { dispatchRehearsalEvent } from "../routes/rehearsal.js";
 
 export type RundownTarget = "live" | "rehearsal";
-type CueStatus = "pending" | "active" | "complete";
+type CueStatus = "pending" | "active" | "complete" | "failed" | "cancelled";
 const DEFAULT_RUNDOWN_ID = process.env.SHOWGATHER_RUNDOWN_ID ?? "showgather-v1-demonstration";
 
 interface PersistedCue { id: string; label: string; position: number; commandPayload: unknown; enabled: boolean; }
@@ -33,6 +33,12 @@ export class PersistentRundown {
     const previous = await this.db.rundownCueExecution.findFirst({ where: { sessionId: session.id, rundownCueId: cue.id }, orderBy: { createdAt: "desc" } });
     if (previous?.status === "dispatched" && !rerun) return { ...(await this.snapshot(target, rundownId)), eventId: previous.executionId, duplicate: true };
     if (previous?.status === "accepted" && !rerun) return { ...(await this.snapshot(target, rundownId)), eventId: previous.executionId, duplicate: true };
+    if (previous?.status === "failed" && !rerun && target === "live") {
+      const result = await retryLiveEvent(previous.executionId);
+      const retryError = (result.injectionResponse as { error?: string }).error ?? "dispatch failed";
+      await this.db.rundownCueExecution.update({ where: { id: previous.id }, data: result.status === "dispatched" ? { status: "dispatched", revision: result.revision, executedAt: new Date(), error: null } : { status: result.status === "cancelled" ? "cancelled" : "failed", error: retryError } });
+      return { ...(await this.snapshot(target, rundownId)), event: result.event, dispatchStatus: result.status };
+    }
 
     const executionId = rerun || !previous ? `run-${target}-${cue.id}-${rerun ? Date.now() : "initial"}` : previous.executionId;
     const created = createEvent({ command: cue.commandPayload as PresentationCommandPayload });
@@ -65,7 +71,7 @@ export class PersistentRundown {
   }
 
   private view(cue: PersistedCue, execution?: { status: string; executionId: string; error: string | null }): CueView {
-    const status: CueStatus = execution?.status === "dispatched" ? "complete" : execution?.status === "accepted" ? "active" : "pending";
+    const status: CueStatus = execution?.status === "dispatched" ? "complete" : execution?.status === "accepted" ? "active" : execution?.status === "failed" ? "failed" : execution?.status === "cancelled" ? "cancelled" : "pending";
     return { id: cue.id, label: cue.label, order: cue.position, command: cue.commandPayload as PresentationCommandPayload, enabled: cue.enabled, status, ...(execution ? { executionId: execution.executionId } : {}), ...(execution?.error ? { error: execution.error } : {}) };
   }
 }

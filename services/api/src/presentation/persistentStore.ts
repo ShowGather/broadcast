@@ -87,6 +87,11 @@ export class PersistentPresentationStore {
     return this.commandResult(await this.db.presentationCommand.findUniqueOrThrow({ where: { id: outbox.commandId } }), channelId);
   }
 
+  async retryByEventId(channelId: string, eventId: string): Promise<AcceptedPresentationCommand> {
+    const outbox = await this.db.presentationOutbox.findFirstOrThrow({ where: { channelId, command: { eventId } } });
+    return this.retry(channelId, outbox.id);
+  }
+
   async cancel(channelId: string, outboxId: string): Promise<AcceptedPresentationCommand> {
     const outbox = await this.db.presentationOutbox.findFirstOrThrow({ where: { id: outboxId, channelId }, include: { command: true } });
     if (outbox.status !== "failed") throw new Error("only failed commands can be cancelled");

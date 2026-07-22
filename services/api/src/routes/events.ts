@@ -73,6 +73,17 @@ export async function dispatchLiveEvent(event: ShowGatherEvent, source = "direct
   return dispatch;
 }
 
+export async function retryLiveEvent(eventId: string): Promise<StoredEvent> {
+  if (!persistentStore) throw new Error("persistent retry is unavailable without database configuration");
+  const channel = await prisma.channel.findUniqueOrThrow({ where: { slug: process.env.SHOWGATHER_CHANNEL_SLUG ?? "demo-channel" } });
+  const result = await persistentStore.retryByEventId(channel.id, eventId);
+  return {
+    event: result.event, injectedAt: new Date().toISOString(),
+    injectionResponse: { status: result.status, ...(result.error ? { error: result.error } : {}) },
+    status: result.status, ...(result.revision !== undefined ? { revision: result.revision } : {}),
+  };
+}
+
 export function createEvent(body: EventRequest): { event: ShowGatherEvent } | { error: string } {
   const { title, message, durationMs, cue, action, command } = body;
 
