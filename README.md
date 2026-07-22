@@ -2,7 +2,7 @@
 
 ShowGather synchronises cue-driven graphics and surrounding web experiences with live HLS playback using timed metadata and media presentation timestamps (PTS).
 
-This is a **V1 pilot release candidate built on a verified timed-metadata proof of concept**. It is demonstrable locally, not a production deployment.
+This is a **V1.1 pilot release candidate built on a verified timed-metadata proof of concept**. It is demonstrable locally, not a production deployment.
 
 ## What V1 does
 
@@ -11,6 +11,8 @@ This is a **V1 pilot release candidate built on a verified timed-metadata proof 
 - Score, lower third, alert, sponsor takeover, ticker, and regional clear commands.
 - Live ID3 transport plus a development-only rehearsal SSE path.
 - Revisioned durable snapshots for late joins/reconnects; transient graphics remain tied to media PTS.
+- Persistent channels, productions, rundowns, command history, and ordered
+  recovery through retry or same-revision cancellation.
 
 ## Architecture
 
