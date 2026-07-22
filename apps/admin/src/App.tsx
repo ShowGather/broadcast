@@ -85,6 +85,9 @@ export default function App() {
   const [layoutProfile, setLayoutProfile] = useState<LayoutProfile>("desktop");
   const [layoutSurface, setLayoutSurface] = useState<LayoutSurface>("video");
   const [layoutAnchor, setLayoutAnchor] = useState<LayoutAnchor>("top-left");
+  const [layoutX, setLayoutX] = useState(.04);
+  const [layoutY, setLayoutY] = useState(.04);
+  const [layoutWidth, setLayoutWidth] = useState(.36);
   const [selectedElement, setSelectedElement] = useState("scorebug");
   const [configurations, setConfigurations] = useState<ShowConfiguration[]>([]);
   const workspace = route.workspace === "productions" ? "prepare" : route.workspace;
@@ -312,7 +315,7 @@ export default function App() {
   const runCue = rundown[runCueIndex];
   const nextRunCue = rundown.slice(runCueIndex + 1).find((cue) => cue.enabled && cue.status !== "complete");
   const saveLayoutPreset = () => setPresentationLayouts((current) => {
-    const placement = placementPreset(layoutSurface, layoutAnchor);
+    const placement = { ...placementPreset(layoutSurface, layoutAnchor), x: layoutX, y: layoutY, width: layoutWidth };
     const existing = current.find((definition) => definition.instanceId === layoutInstanceId);
     if (existing) return current.map((definition) => definition.instanceId === layoutInstanceId ? { ...definition, placementByProfile: { ...definition.placementByProfile, [layoutProfile]: placement } } : definition);
     return [...current, { instanceId: layoutInstanceId, placementByProfile: { [layoutProfile]: placement } }];
@@ -327,7 +330,8 @@ export default function App() {
       clock: { instanceId: "programme-clock", command: "clock", surface: "video", anchor: "top-centre" },
     };
     const selected = defaults[kind];
-    setSelectedElement(kind); if (selected.command) setCommandKind(selected.command); setCommandInstanceId(selected.instanceId); setLayoutInstanceId(selected.instanceId); setLayoutSurface(selected.surface); setLayoutAnchor(selected.anchor);
+    const placement = placementPreset(selected.surface, selected.anchor);
+    setSelectedElement(kind); if (selected.command) setCommandKind(selected.command); setCommandInstanceId(selected.instanceId); setLayoutInstanceId(selected.instanceId); setLayoutSurface(selected.surface); setLayoutAnchor(selected.anchor); setLayoutX(placement.x); setLayoutY(placement.y); setLayoutWidth(placement.width);
     setStatus(selected.command ? `${kind} selected. Choose a profile and apply a placement preset, then configure its typed command.` : `${kind} selected. Configure its profile placement; programme clock content is currently supplied by a scene or future clock command.`);
   };
 
@@ -399,6 +403,7 @@ export default function App() {
           <label><span>Profile</span><select value={layoutProfile} onChange={(event) => setLayoutProfile(event.target.value as LayoutProfile)}>{(["desktop", "tv", "mobile"] as const).map((profile) => <option key={profile}>{profile}</option>)}</select></label>
           <label><span>Surface</span><select value={layoutSurface} onChange={(event) => setLayoutSurface(event.target.value as LayoutSurface)}>{(["video", "surround", "companion"] as const).map((surface) => <option key={surface}>{surface}</option>)}</select></label>
           <label><span>Preset</span><select value={layoutAnchor} onChange={(event) => setLayoutAnchor(event.target.value as LayoutAnchor)}>{(["top-left", "top-centre", "top-right", "centre-left", "centre", "centre-right", "bottom-left", "bottom-centre", "bottom-right"] as const).map((anchor) => <option key={anchor}>{anchor}</option>)}</select></label>
+          <label><span>Horizontal offset</span><input type="number" min={0} max={1} step={.01} value={layoutX} onChange={(event) => setLayoutX(Number(event.target.value))} /></label><label><span>Vertical offset</span><input type="number" min={0} max={1} step={.01} value={layoutY} onChange={(event) => setLayoutY(Number(event.target.value))} /></label><label><span>Width</span><input type="number" min={.08} max={1} step={.01} value={layoutWidth} onChange={(event) => setLayoutWidth(Number(event.target.value))} /></label>
           <button type="button" onClick={saveLayoutPreset}>Apply preset</button>
           {presentationLayouts.length > 0 && <ul className="placement-summary">{presentationLayouts.map((definition) => <li key={definition.instanceId}><b>{definition.instanceId}</b> · {Object.entries(definition.placementByProfile).map(([profile, placement]) => `${profile}: ${placement?.surface} ${placement?.anchor}`).join(" · ")}</li>)}</ul>}
         </fieldset>
