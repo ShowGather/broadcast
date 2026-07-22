@@ -2,6 +2,7 @@
 body { margin: 0; background: #080b12; color: #e7edf7; font-family: Inter, ui-sans-serif, system-ui, sans-serif; }
 button { font: inherit; }
 .app { width: min(1440px, 100%); margin: 0 auto; padding: 18px; }
+.app--embedded { padding: 10px; }.embedded-status { margin: 0 0 8px; color: #8b9bb5; font-size: .72rem; }
 .app-header { display: flex; align-items: center; justify-content: space-between; gap: 16px; margin-bottom: 16px; }
 .app-header h1 { margin: 0; font-size: 1.25rem; letter-spacing: -.02em; }
 .status { display: block; margin-top: 3px; color: #8b9bb5; font-size: .78rem; }

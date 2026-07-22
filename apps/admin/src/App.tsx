@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
+import { adminPath, parseAdminRoute, type AdminRoute } from "./routing.js";
 
 interface StoredEvent {
   event: { id: string; t: string; p: Record<string, unknown> };
@@ -20,13 +21,13 @@ function eventLabel(event: StoredEvent["event"]) {
 }
 
 export default function App() {
+  const [route, setRoute] = useState<AdminRoute>(() => parseAdminRoute(window.location.pathname));
   const [events, setEvents] = useState<StoredEvent[]>([]);
   const [title, setTitle] = useState("");
   const [message, setMessage] = useState("");
   const [duration, setDuration] = useState(5000);
   const [status, setStatus] = useState("");
   const [error, setError] = useState("");
-  const [rehearsal, setRehearsal] = useState(false);
   const [commandKind, setCommandKind] = useState("score");
   const [primary, setPrimary] = useState("");
   const [secondary, setSecondary] = useState("");
@@ -38,7 +39,7 @@ export default function App() {
   const [productions, setProductions] = useState<Production[]>([]);
   const [rundowns, setRundowns] = useState<Rundown[]>([]);
   const [channelId, setChannelId] = useState(() => localStorage.getItem("showgather.channelId") ?? "");
-  const [productionId, setProductionId] = useState(() => localStorage.getItem("showgather.productionId") ?? "");
+  const [productionId, setProductionId] = useState(() => route.productionId ?? localStorage.getItem("showgather.productionId") ?? "");
   const [rundownId, setRundownId] = useState(() => localStorage.getItem("showgather.rundownId") ?? "");
   const [outbox, setOutbox] = useState<OutboxItem[]>([]);
   const [selectionError, setSelectionError] = useState("");
@@ -52,6 +53,21 @@ export default function App() {
   const [awayTeam, setAwayTeam] = useState("AWAY");
   const [tickerLabel, setTickerLabel] = useState("LIVE");
   const [configurations, setConfigurations] = useState<ShowConfiguration[]>([]);
+  const workspace = route.workspace === "productions" ? "prepare" : route.workspace;
+  const rehearsal = workspace === "rehearse";
+  const navigate = useCallback((next: AdminRoute, replace = false) => {
+    const path = adminPath(next);
+    window.history[replace ? "replaceState" : "pushState"]({}, "", path);
+    setRoute(next);
+  }, []);
+
+  useEffect(() => {
+    const onPopState = () => setRoute(parseAdminRoute(window.location.pathname));
+    window.addEventListener("popstate", onPopState);
+    if (route.workspace === "productions" && window.location.pathname !== "/admin/productions") navigate({ workspace: "productions" }, true);
+    return () => window.removeEventListener("popstate", onPopState);
+  }, [navigate, route.workspace]);
+  useEffect(() => { if (route.productionId && route.productionId !== productionId) setProductionId(route.productionId); }, [productionId, route.productionId]);
 
   useEffect(() => {
     fetch("/api/channels").then(async (response) => {
@@ -68,9 +84,13 @@ export default function App() {
     fetch(`/api/channels/${channelId}/productions`).then(async (response) => {
       if (!response.ok) throw new Error("Unable to load productions");
       const items = await response.json() as Production[]; setProductions(items);
+      if (route.productionId && !items.some((item) => item.id === route.productionId)) {
+        setSelectionError("That production is unavailable. Choose an existing production or create a new one.");
+        navigate({ workspace: "productions" }, true);
+      }
       setProductionId((current) => items.some((item) => item.id === current) ? current : items[0]?.id ?? "");
     }).catch((reason) => setSelectionError(reason instanceof Error ? reason.message : "Unable to load productions"));
-  }, [channelId]);
+  }, [channelId, navigate, route.productionId]);
   useEffect(() => {
     if (!productionId) return;
     fetch(`/api/productions/${productionId}/rundowns`).then(async (response) => {
@@ -177,13 +197,13 @@ export default function App() {
     } catch (reason) { setError(reason instanceof Error ? reason.message : "Unable to save"); return undefined; }
   };
   const refreshShowContext = async () => { await reloadProduction(); await reloadRundownDefinition(); await reloadConfigurations(); };
-  const createProduction = async () => {
-    const result = await mutate(`/api/channels/${channelId}/productions`, "POST", { title: productionTitle || "New production", description: productionDescription, status: productionStatus }, "Production created");
-    if (result?.id) { setProductions(await (await fetch(`/api/channels/${channelId}/productions`)).json() as Production[]); setProductionId(result.id); }
+  const createProduction = async (fresh = false) => {
+    const result = await mutate(`/api/channels/${channelId}/productions`, "POST", { title: fresh ? "New production" : productionTitle || "New production", description: fresh ? "" : productionDescription, status: fresh ? "draft" : productionStatus }, "Production created");
+    if (result?.id) { setProductions(await (await fetch(`/api/channels/${channelId}/productions`)).json() as Production[]); setProductionId(result.id); navigate({ workspace: "prepare", productionId: result.id }); }
   };
   const duplicateProduction = async () => {
     const result = await mutate(`/api/productions/${productionId}/duplicate`, "POST", {}, "Production duplicated");
-    if (result?.id) { setProductions(await (await fetch(`/api/channels/${channelId}/productions`)).json() as Production[]); setProductionId(result.id); }
+    if (result?.id) { setProductions(await (await fetch(`/api/channels/${channelId}/productions`)).json() as Production[]); setProductionId(result.id); navigate({ workspace: "prepare", productionId: result.id }); }
   };
   const addCue = async () => { await mutate(`/api/rundowns/${rundownId}/cues`, "POST", { label: label.trim() || `${commandKind} cue`, command: currentCommand(), enabled: true }, "Cue saved", async () => { await reloadRundownDefinition(); await fetchRundown(); }); };
   const editCue = async (cue: RundownDefinitionCue, changes: Record<string, unknown>) => { await mutate(`/api/rundown-cues/${cue.id}`, "PUT", changes, "Cue updated", async () => { await reloadRundownDefinition(); await fetchRundown(); }); };
@@ -212,28 +232,38 @@ export default function App() {
     } catch (reason) { setError(reason instanceof Error ? reason.message : `Unable to ${action} command`); }
   };
 
-  return <div className="container">
-    <header className="header"><h1>ShowGather Broadcast — Control</h1><p>{rehearsal ? "Rehearsal cues go only to opted-in preview players." : "Live controls send compact, timed metadata to the HLS pipeline."}</p><p className={`connection connection--${apiConnection}`}>API {apiConnection}</p>
-      <button className={`mode-toggle ${rehearsal ? "rehearsal" : ""}`} onClick={() => setRehearsal((current) => !current)}>{rehearsal ? "🟡 Rehearsal mode" : "🔴 Live mode"}</button>
-    </header>
+  const selectedProduction = productions.find((production) => production.id === productionId);
+  const playerPreviewUrl = channelId ? `${window.location.protocol}//${window.location.hostname}:3003/player/${encodeURIComponent(channelId)}?profile=desktop&rehearsal=1&embedded=1&productionId=${encodeURIComponent(productionId)}` : "";
 
-    <section className="section">
-      <h2>Show context</h2>
+  return <div className={`container workspace workspace--${workspace}`}>
+    <header className="admin-shell__header"><div><a className="admin-shell__brand" href="/admin/productions" onClick={(event) => { event.preventDefault(); navigate({ workspace: "productions" }); }}>ShowGather</a><p>{workspace === "run" ? "Focused live operation" : workspace === "rehearse" ? "Safe rehearsal — no live presentation changes" : "Prepare saved productions and rundowns"}</p></div><p className={`connection connection--${apiConnection}`}>API {apiConnection}</p></header>
+    <nav className="admin-shell__nav" aria-label="Production workspace">
+      <button className={route.workspace === "productions" ? "active" : ""} onClick={() => navigate({ workspace: "productions" })}>Productions</button>
+      {(["prepare", "rehearse", "run"] as const).map((item) => <button key={item} disabled={!productionId} className={workspace === item ? "active" : ""} onClick={() => navigate({ workspace: item, productionId })}>{item}</button>)}
+    </nav>
+
+    <section className="section admin-context">
+      <h2>{route.workspace === "productions" ? "Choose a production" : `${workspace} · ${selectedProduction?.title ?? "Loading production"}`}</h2>
       <div className="form">
         <label><span>Channel</span><select value={channelId} onChange={(event) => setChannelId(event.target.value)}>{channels.map((channel) => <option key={channel.id} value={channel.id}>{channel.name}</option>)}</select></label>
-        <label><span>Production</span><select value={productionId} onChange={(event) => setProductionId(event.target.value)}>{productions.map((production) => <option key={production.id} value={production.id}>{production.title}</option>)}</select></label>
-        <label><span>Rundown</span><select value={rundownId} onChange={(event) => setRundownId(event.target.value)}>{rundowns.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}</select></label>
+        <label><span>Production</span><select value={productionId} onChange={(event) => { setProductionId(event.target.value); navigate({ workspace: route.workspace === "productions" ? "prepare" : workspace, productionId: event.target.value }); }}>{productions.map((production) => <option key={production.id} value={production.id}>{production.title}</option>)}</select></label>
+        {route.workspace !== "productions" && <label><span>Rundown</span><select value={rundownId} onChange={(event) => setRundownId(event.target.value)}>{rundowns.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}</select></label>}
       </div>
-      {selectionError && <p className="error-msg">{selectionError}</p>}
+      {selectionError && <p className="error-msg" role="alert">{selectionError}</p>}
     </section>
 
-    <section className="section">
+    {route.workspace === "productions" && <section className="section">
+      <h2>Start a production</h2><p className="hint">Choose an existing production above, or create a saved production to begin preparing a new show.</p>
+      <button onClick={() => createProduction(true)} disabled={!channelId}>Create a new production</button>
+    </section>}
+
+    {workspace === "prepare" && <><section className="section">
       <h2>Production editor</h2>
       <div className="form">
         <label><span>Title</span><input value={productionTitle} onChange={(event) => setProductionTitle(event.target.value)} /></label>
         <label><span>Description</span><input value={productionDescription} onChange={(event) => setProductionDescription(event.target.value)} /></label>
         <label><span>Status</span><select value={productionStatus} onChange={(event) => setProductionStatus(event.target.value)}><option value="draft">Draft</option><option value="rehearsal">Rehearsal</option><option value="live">Live</option><option value="complete">Complete</option><option value="archived">Archived</option></select></label>
-        <button onClick={createProduction}>Create production</button><button disabled={!productionId} onClick={() => mutate(`/api/productions/${productionId}`, "PUT", { title: productionTitle, description: productionDescription, status: productionStatus }, "Production saved", refreshShowContext)}>Save production</button><button disabled={!productionId} onClick={duplicateProduction}>Duplicate production</button>
+        <button onClick={() => createProduction()}>Create production</button><button disabled={!productionId} onClick={() => mutate(`/api/productions/${productionId}`, "PUT", { title: productionTitle, description: productionDescription, status: productionStatus }, "Production saved", refreshShowContext)}>Save production</button><button disabled={!productionId} onClick={duplicateProduction}>Duplicate production</button>
       </div>
       <h3>Reusable show configuration</h3>
       <div className="form">
@@ -252,9 +282,14 @@ export default function App() {
       <div className="form"><label><span>Rundown name</span><input value={rundownName} onChange={(event) => setRundownName(event.target.value)} /></label><button disabled={!productionId} onClick={async () => { const result = await mutate(`/api/productions/${productionId}/rundowns`, "POST", { name: rundownName || "New rundown" }, "Rundown created"); if (result?.id) { setRundowns(await (await fetch(`/api/productions/${productionId}/rundowns`)).json() as Rundown[]); setRundownId(result.id); } }}>Create rundown</button><button disabled={!rundownId} onClick={() => mutate(`/api/rundowns/${rundownId}`, "PUT", { name: rundownName }, "Rundown saved", reloadRundownDefinition)}>Save rundown</button><button disabled={!rundownId} onClick={async () => { const result = await mutate(`/api/rundowns/${rundownId}/duplicate`, "POST", {}, "Rundown duplicated"); if (result?.id) { setRundowns(await (await fetch(`/api/productions/${productionId}/rundowns`)).json() as Rundown[]); setRundownId(result.id); } }}>Duplicate rundown</button></div>
       {rundownDefinition.map((cue, index) => <div className="cue-grid" key={cue.id}><strong>{cue.position}. {cue.label}</strong><span className="hint">{String(cue.commandPayload.k)} {cue.enabled ? "enabled" : "disabled"}</span><button onClick={() => editCue(cue, { enabled: !cue.enabled })}>{cue.enabled ? "Disable" : "Enable"}</button><button disabled={index === 0} onClick={() => moveCue(index, -1)}>Move up</button><button disabled={index === rundownDefinition.length - 1} onClick={() => moveCue(index, 1)}>Move down</button></div>)}
       <p className="hint">The typed command form below can send immediately or save a new cue into this rundown. Execution sessions use a frozen copy of this definition.</p>
-    </section>
+    </section></>}
 
-    <section className="section quick-cues">
+    {workspace === "rehearse" && <section className="section rehearsal-preview">
+      <h2>Rehearsal preview</h2><p className="hint">This embeds the real Player in rehearsal mode. It never sends rehearsal cues to the live stream.</p>
+      {playerPreviewUrl ? <iframe title="Rehearsal Player preview" src={playerPreviewUrl} className="player-preview" /> : <p className="empty">Choose a channel to load the preview.</p>}
+    </section>}
+
+    {workspace !== "prepare" && <section className="section quick-cues">
       <h2>On-air cues</h2>
       <div className="cue-grid">
         <button onClick={() => send({ cue: "goal-home", durationMs: 15_000 }, "Home Goal sent")}>⚽ Home Goal</button>
@@ -263,18 +298,18 @@ export default function App() {
         <button className="safe-clear" onClick={() => send({ action: "safe-clear" }, "Safe Clear sent")}>✕ Safe Clear</button>
       </div>
       <p className="hint">Safe Clear removes presentation only. The programme video continues uninterrupted.</p>
-    </section>
+    </section>}
 
-    <section className="section">
+    {workspace !== "prepare" && <section className="section">
       <h2>Rundown — {rehearsal ? "Rehearsal" : "Live"}</h2>
       <p className="hint">GO uses an idempotent execution ID. Completed cues require explicit re-run; rehearsal state is separate from live.</p>
       <button disabled={!rundownId} onClick={() => mutate(`/api/rundown/${rehearsal ? "rehearsal" : "live"}/sessions?rundownId=${encodeURIComponent(rundownId)}`, "POST", {}, `${rehearsal ? "Rehearsal" : "Live"} session started`, fetchRundown)}>Start new {rehearsal ? "rehearsal" : "live"} session</button>
       <div className="cue-grid">
         {rundown.map((cue) => <div key={cue.id}><strong>{cue.order}. {cue.label}</strong><span className="hint"> {cue.status}</span><button disabled={cue.status === "active" || cue.status === "cancelled"} onClick={() => goCue(cue)}>{cue.status === "failed" ? "Retry" : "GO"}</button>{cue.status === "complete" && <button onClick={() => goCue(cue, true)}>Re-run</button>}</div>)}
       </div>
-    </section>
+    </section>}
 
-    <section className="section">
+    {workspace !== "run" && <section className="section">
       <h2>Configurable presentation command</h2>
       <div className="form">
         <label><span>Action</span><select value={commandKind} onChange={(event) => { setCommandKind(event.target.value); setPrimary(""); setSecondary(""); setLabel(""); }}>
@@ -283,12 +318,12 @@ export default function App() {
         {commandKind === "score" ? <><label><span>Home score</span><input type="number" min={0} max={999} value={primary} onChange={(event) => setPrimary(event.target.value)} /></label><label><span>Away score</span><input type="number" min={0} max={999} value={secondary} onChange={(event) => setSecondary(event.target.value)} /></label><label><span>Label</span><input value={label} maxLength={12} onChange={(event) => setLabel(event.target.value)} placeholder="GOAL" /></label></>
           : commandKind === "clear" ? <><label><span>Region</span><select value={primary} onChange={(event) => setPrimary(event.target.value)}><option value="">All regions</option><option value="v">Video overlay</option><option value="h">Header</option><option value="l">Left rail</option><option value="r">Right rail</option><option value="f">Footer</option></select></label><label><span>Layer (optional)</span><input value={secondary} maxLength={16} onChange={(event) => setSecondary(event.target.value)} placeholder="primary" /></label></>
           : <><label><span>{commandKind === "sponsor" ? "Brand" : commandKind === "ticker" ? "Ticker text" : "Title"}</span><input value={primary} maxLength={20} onChange={(event) => setPrimary(event.target.value)} /></label>{commandKind !== "ticker" && <label><span>{commandKind === "alert" ? "Message" : "Subtitle / tagline"}</span><input value={secondary} maxLength={20} onChange={(event) => setSecondary(event.target.value)} /></label>}{commandKind === "ticker" && <label><span>Label</span><input value={label} maxLength={12} onChange={(event) => setLabel(event.target.value)} /></label>}{commandKind !== "ticker" && <label><span>Duration (ms)</span><input type="number" min={1000} step={1000} value={commandDuration} onChange={(event) => setCommandDuration(Number(event.target.value))} /></label>}</>}
-        <button onClick={sendCommand}>Send configurable command</button><button disabled={!rundownId} onClick={addCue}>Save as rundown cue</button>
+        <button onClick={sendCommand}>{rehearsal ? "Trigger rehearsal command" : "Send configurable command"}</button>{workspace === "prepare" && <button disabled={!rundownId} onClick={addCue}>Save as rundown cue</button>}
       </div>
       <p className="hint">Text is byte-bounded for the compact timed-ID3 envelope. Score, ticker, persistent sponsor, and clear update the late-join snapshot.</p>
-    </section>
+    </section>}
 
-    <section className="section">
+    {workspace === "prepare" && <section className="section">
       <h2>Custom legacy overlay</h2>
       <div className="form">
         <label><span>Title</span><input value={title} onChange={(event) => setTitle(event.target.value)} placeholder="e.g. Goal!" /></label>
@@ -296,15 +331,15 @@ export default function App() {
         <label><span>Duration (ms)</span><input type="number" min={1000} step={1000} value={duration} onChange={(event) => setDuration(Number(event.target.value))} /></label>
         <button onClick={() => send({ title: title.trim(), message: message.trim() || undefined, durationMs: duration }, "Overlay sent")}>Send Overlay</button>
       </div>
-    </section>
+    </section>}
 
     {status && <p className="status-msg">{status}</p>}
     {error && <p className="error-msg">{error}</p>}
-    <section className="section"><h2>Recent on-air events</h2>
+    {workspace !== "run" && <section className="section"><h2>Recent on-air events</h2>
       {events.length === 0 ? <p className="empty">No events yet.</p> : <table className="events-table"><thead><tr><th>Event</th><th>Type</th><th>Time</th></tr></thead><tbody>
         {events.map((stored) => <tr key={stored.event.id}><td>{eventLabel(stored.event)}</td><td className="mono">{stored.event.t}</td><td className="mono">{new Date(stored.injectedAt).toLocaleTimeString()}</td></tr>)}
       </tbody></table>}
-    </section>
+    </section>}
     <section className="section"><h2>Live dispatch status</h2>
       {outbox.length === 0 ? <p className="empty">No durable commands have been submitted.</p> : <table className="events-table"><thead><tr><th>Command</th><th>Revision</th><th>Status</th><th>Action</th></tr></thead><tbody>
         {outbox.map((item) => <tr key={item.id}><td>{item.label}<br /><span className="hint mono">{item.eventId}</span>{item.error && <p className="error-msg">{item.error}</p>}</td><td>{item.revision}</td><td>{item.status}</td><td>{item.retryable && <button onClick={() => resolveOutbox(item, "retry")}>Retry</button>}{item.cancellable && <button className="safe-clear" onClick={() => resolveOutbox(item, "cancel")}>Cancel</button>}</td></tr>)}

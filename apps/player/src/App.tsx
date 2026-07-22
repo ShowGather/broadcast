@@ -19,9 +19,12 @@ function deltaClass(delta: number | null): string {
 
 function ViewerExperience() {
   const videoRef = useRef<HTMLVideoElement>(null);
-  const requestedProfile = new URLSearchParams(window.location.search).get("profile");
+  const search = new URLSearchParams(window.location.search);
+  const requestedProfile = search.get("profile");
   const [profile, setProfile] = useState<ViewerProfile>(requestedProfile === "mobile" || requestedProfile === "tv" ? requestedProfile : "desktop");
-  const rehearsal = new URLSearchParams(window.location.search).get("rehearsal") === "1";
+  const rehearsal = search.get("rehearsal") === "1";
+  const embedded = search.get("embedded") === "1";
+  const channelId = window.location.pathname.match(/^\/player\/([^/]+)/)?.[1];
   const { applyCommand, expireAt, replaceState } = usePresentation();
   const revisionGate = useRef(new PersistentRevisionGate());
   const hydrateSnapshot = useCallback(() => {
@@ -73,13 +76,14 @@ function ViewerExperience() {
     </table>
   </aside>;
 
-  return <div className="app">
-    <header className="app-header">
+  return <div className={`app ${embedded ? "app--embedded" : ""}`}>
+    {!embedded && <header className="app-header">
       <div><h1>ShowGather Viewer</h1><span className="status">{status}{rehearsal ? " • rehearsal listener active" : ""}</span></div>
       <div className="profile-switcher" aria-label="Preview profile">
         {(["desktop", "mobile", "tv"] as ViewerProfile[]).map((candidate) => <button key={candidate} className={profile === candidate ? "active" : ""} onClick={() => setProfile(candidate)}>{candidate}</button>)}
       </div>
-    </header>
+    </header>}
+    {embedded && <p className="embedded-status">Preview · {channelId ? `channel ${channelId}` : "selected channel"}{rehearsal ? " · rehearsal" : ""}</p>}
     <ViewerShell profile={profile} video={video} diagnostics={diagnostics} />
   </div>;
 }

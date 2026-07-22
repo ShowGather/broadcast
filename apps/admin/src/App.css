@@ -12,10 +12,17 @@ body {
 }
 
 .container {
-  max-width: 640px;
+  max-width: 1180px;
   margin: 0 auto;
-  padding: 24px 20px;
+  padding: 24px 20px 48px;
 }
+
+.admin-shell__header { display: flex; align-items: flex-start; justify-content: space-between; gap: 18px; padding-bottom: 16px; border-bottom: 1px solid #2a3445; }
+.admin-shell__brand { color: #eef7ff; font-size: 1.25rem; font-weight: 760; letter-spacing: -.02em; text-decoration: none; }.admin-shell__header p { margin: 5px 0 0; color: #8490a2; font-size: .84rem; }
+.admin-shell__nav { display: flex; gap: 6px; margin: 16px 0 24px; padding: 6px; border: 1px solid #2a3445; border-radius: 9px; background: #131b28; }.admin-shell__nav button { flex: 1; padding: 9px 12px; border: 0; border-radius: 6px; background: transparent; color: #9fb0c5; cursor: pointer; text-transform: capitalize; }.admin-shell__nav button.active { background: #273d5b; color: #eff8ff; font-weight: 750; }.admin-shell__nav button:disabled { cursor: not-allowed; opacity: .45; }
+.admin-context { padding: 16px; border: 1px solid #2a3445; border-radius: 10px; background: #121a26; }.admin-context .form { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; }.admin-context .form select { width: 100%; }
+.workspace--rehearse .admin-shell__header { border-color: #8c7028; }.workspace--rehearse .admin-shell__nav { border-color: #8c7028; background: #211d13; }.workspace--run .admin-shell__header { border-color: #8e3939; }.workspace--run .admin-shell__nav { border-color: #8e3939; background: #241619; }
+.rehearsal-preview { padding: 16px; border: 1px solid #8c7028; border-radius: 10px; background: #1e1a11; }.player-preview { display: block; width: 100%; min-height: 430px; margin-top: 14px; border: 1px solid #45536a; border-radius: 8px; background: #080b12; }
 
 .header h1 {
   font-size: 1.4rem;
@@ -97,6 +104,7 @@ body {
   color: #e0e0e0;
   font-size: 0.95rem;
 }
+.form select { padding: 8px 10px; border: 1px solid #333; border-radius: 4px; background: #1a1a1a; color: #e0e0e0; font-size: .95rem; }
 
 .form input:focus {
   outline: none;
@@ -167,3 +175,5 @@ body {
   font-size: 0.85rem;
   color: #999;
 }
+button:focus-visible, input:focus-visible, select:focus-visible, a:focus-visible { outline: 3px solid #73e3ff; outline-offset: 2px; }
+@media (max-width: 720px) { .admin-shell__header { flex-direction: column; }.admin-shell__nav { overflow-x: auto; }.admin-shell__nav button { min-width: 110px; }.admin-context .form { grid-template-columns: 1fr; }.player-preview { min-height: 280px; } }
