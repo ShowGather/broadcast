@@ -384,6 +384,12 @@ export default function App() {
     setSelectedElement(kind); if (selected.command) setCommandKind(selected.command); setCommandInstanceId(selected.instanceId); setLayoutInstanceId(selected.instanceId); setLayoutSurface(selected.surface); setLayoutAnchor(selected.anchor); setLayoutX(placement.x); setLayoutY(placement.y); setLayoutWidth(placement.width); setLayoutHeight(""); setLayoutOpacity(1); setLayoutRotation(0); setLayoutCropTop(0); setLayoutCropRight(0); setLayoutCropBottom(0); setLayoutCropLeft(0); setLayoutSafeArea(placement.safeArea ?? false); setLayoutPolicy(placement.layout === "column" ? "column" : "overlay");
     setStatus(`${kind} selected. Choose a profile and apply a placement preset, then configure its typed command.`);
   };
+  const dropElementOnPreset = (kind: "scorebug" | "lower-third" | "ticker" | "alert" | "sponsor-panel" | "clock", anchor: LayoutAnchor) => {
+    chooseElement(kind);
+    const placement = placementPreset("video", anchor);
+    setLayoutSurface("video"); setLayoutAnchor(anchor); setLayoutX(placement.x); setLayoutY(placement.y); setLayoutWidth(placement.width); setLayoutSafeArea(true); setLayoutPolicy(placement.layout === "column" ? "column" : "overlay");
+    setStatus(`${kind.replace("-", " ")} assigned to the ${anchor.replace("-", " ")} video preset. Apply the profile placement to save it.`);
+  };
   const currentShowConfiguration = () => ({ sport: "football", homeTeam, awayTeam, tickerLabel, ...(programmeTitle.trim() ? { programmeTitle: programmeTitle.trim() } : {}), ...(programmeSubtitle.trim() ? { programmeSubtitle: programmeSubtitle.trim() } : {}), ...(liveLabel.trim() ? { liveLabel: liveLabel.trim() } : {}), accent, enabledCompanionPanels: enabledPanels, companionPanelLabels: { match: matchPanelLabel.trim() || "Match", info: infoPanelLabel.trim() || "Info", partners: partnersPanelLabel.trim() || "Partners", interact: interactPanelLabel.trim() || "Interact" }, ...(presentationInstances.length ? { presentationInstances } : {}), ...(presentationLayouts.length ? { presentationLayouts } : {}) });
 
   return <div className={`container workspace workspace--${workspace}`}>
@@ -419,8 +425,9 @@ export default function App() {
     {workspace === "prepare" && <><section className={`section elements-panel${elementsOpen ? "" : " elements-panel--collapsed"}`} hidden={prepareTab !== "rundown"}>
       <div className="workspace-heading"><div><h2>Elements</h2><p className="hint">Choose a presentation source to target its stable instance, suggested command, and placement preset.</p></div><button type="button" className="elements-panel__toggle" aria-expanded={elementsOpen} onClick={() => setElementsOpen((open) => !open)}>{elementsOpen ? "Collapse" : "Open elements"}</button></div>
       {elementsOpen && <div className="element-library" role="list" aria-label="Presentation elements">
-        {(["scorebug", "lower-third", "ticker", "alert", "sponsor-panel", "clock"] as const).map((kind) => <button key={kind} type="button" role="listitem" className={selectedElement === kind ? "active" : ""} onClick={() => chooseElement(kind)}>{kind === "sponsor-panel" ? "Sponsor bug" : kind.replace("-", " ")}</button>)}
+        {(["scorebug", "lower-third", "ticker", "alert", "sponsor-panel", "clock"] as const).map((kind) => <button key={kind} type="button" role="listitem" draggable className={selectedElement === kind ? "active" : ""} onDragStart={(event) => { event.dataTransfer.setData("application/x-showgather-element", kind); event.dataTransfer.effectAllowed = "copy"; }} onClick={() => chooseElement(kind)}>{kind === "sponsor-panel" ? "Sponsor bug" : kind.replace("-", " ")}</button>)}
       </div>}
+      {elementsOpen && <div className="placement-zones" aria-label="Video placement presets"><span>Drag an element onto a named placement preset</span><div>{(["top-left", "top-centre", "top-right", "centre-left", "centre", "centre-right", "bottom-left", "bottom-centre", "bottom-right"] as const).map((anchor) => <button key={anchor} type="button" onDragOver={(event) => event.preventDefault()} onDrop={(event) => { event.preventDefault(); const kind = event.dataTransfer.getData("application/x-showgather-element"); if (["scorebug", "lower-third", "ticker", "alert", "sponsor-panel", "clock"].includes(kind)) dropElementOnPreset(kind as "scorebug" | "lower-third" | "ticker" | "alert" | "sponsor-panel" | "clock", anchor); }} onClick={() => dropElementOnPreset(selectedElement as "scorebug" | "lower-third" | "ticker" | "alert" | "sponsor-panel" | "clock", anchor)}>{anchor.replace("-", " ")}</button>)}</div></div>}
     </section><section className="section">
       <div hidden={prepareTab !== "overview"} className="prepare-overview">
       <div>
