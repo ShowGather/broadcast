@@ -52,6 +52,7 @@ export default function App() {
   const [runCueIndex, setRunCueIndex] = useState(0);
   const [previewProfile, setPreviewProfile] = useState<"desktop" | "mobile" | "tv">("desktop");
   const [confirmation, setConfirmation] = useState<"complete" | "abandon" | "reset" | null>(null);
+  const [diagnosticsOpen, setDiagnosticsOpen] = useState(false);
   const confirmationButton = useRef<HTMLButtonElement>(null);
   const [channels, setChannels] = useState<Channel[]>([]);
   const [productions, setProductions] = useState<Production[]>([]);
@@ -329,7 +330,7 @@ export default function App() {
   };
 
   return <div className={`container workspace workspace--${workspace}`}>
-    <header className="admin-shell__header"><div><a className="admin-shell__brand" href="/admin/productions" onClick={(event) => { event.preventDefault(); navigate({ workspace: "productions" }); }}>ShowGather</a><p>{workspace === "run" ? "Focused live operation" : workspace === "rehearse" ? "Safe rehearsal — no live presentation changes" : "Prepare saved productions and rundowns"}</p></div><div><p className={`connection connection--${apiConnection}`}>API {apiConnection}</p><p className={`connection connection--${streamConnection}`}>Stream {streamConnection}</p></div></header>
+    <header className="admin-shell__header"><div><a className="admin-shell__brand" href="/admin/productions" onClick={(event) => { event.preventDefault(); navigate({ workspace: "productions" }); }}>ShowGather</a><p>{workspace === "run" ? "Focused live operation" : workspace === "rehearse" ? "Safe rehearsal — no live presentation changes" : "Prepare saved productions and rundowns"}</p></div><div className="admin-shell__status"><p className={`connection connection--${apiConnection}`}>API {apiConnection}</p><p className={`connection connection--${streamConnection}`}>Stream {streamConnection}</p><button type="button" className="diagnostics-toggle" aria-expanded={diagnosticsOpen} onClick={() => setDiagnosticsOpen((open) => !open)}>{diagnosticsOpen ? "Hide diagnostics" : "Diagnostics"}</button></div></header>
     <nav className="admin-shell__nav" aria-label="Production workspace">
       <button className={route.workspace === "productions" ? "active" : ""} onClick={() => navigate({ workspace: "productions" })}>Productions</button>
       {(["prepare", "rehearse", "run"] as const).map((item) => <button key={item} disabled={!productionId} className={workspace === item ? "active" : ""} onClick={() => navigate({ workspace: item, productionId })}>{item}</button>)}
@@ -490,6 +491,7 @@ export default function App() {
 
     {status && <p className="status-msg">{status}</p>}
     {error && <p className="error-msg">{error}</p>}
+    {diagnosticsOpen && <aside className="diagnostics-panel" aria-label="Technical diagnostics"><p>Technical diagnostics are secondary. They expose delivery history and recovery detail without changing presentation state.</p>
     {workspace !== "run" && <section className="section"><h2>Recent on-air events</h2>
       {events.length === 0 ? <p className="empty">No events yet.</p> : <table className="events-table"><thead><tr><th>Event</th><th>Type</th><th>Time</th></tr></thead><tbody>
         {events.map((stored) => <tr key={stored.event.id}><td>{eventLabel(stored.event)}</td><td className="mono">{stored.event.t}</td><td className="mono">{new Date(stored.injectedAt).toLocaleTimeString()}</td></tr>)}
@@ -499,6 +501,6 @@ export default function App() {
       {outbox.length === 0 ? <p className="empty">No durable commands have been submitted.</p> : <table className="events-table"><thead><tr><th>Command</th><th>Revision</th><th>Status</th><th>Action</th></tr></thead><tbody>
         {outbox.map((item) => <tr key={item.id}><td>{item.label}{workspace !== "run" && <><br /><span className="hint mono">{item.eventId}</span></>}{item.error && <p className="error-msg">{item.error}</p>}</td><td>{item.revision}</td><td>{item.status}</td><td>{item.retryable && <button onClick={() => resolveOutbox(item, "retry")}>Retry</button>}{item.cancellable && <button className="safe-clear" onClick={() => resolveOutbox(item, "cancel")}>Cancel</button>}</td></tr>)}
       </tbody></table>}
-    </section>
+    </section></aside>}
   </div>;
 }
