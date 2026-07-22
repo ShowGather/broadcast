@@ -9,7 +9,7 @@
     "dev:api": "pnpm --filter @showgather/api dev",
     "dev:admin": "pnpm --filter @showgather/admin dev",
     "dev:player": "pnpm --filter @showgather/player dev",
-    "build": "pnpm --filter @showgather/event-schema build && pnpm --filter @showgather/id3 build && pnpm --filter @showgather/presentation-model build && pnpm --filter @showgather/api build && pnpm --filter @showgather/admin build && pnpm --filter @showgather/player build",
+    "build": "pnpm --filter @showgather/event-schema build && pnpm --filter @showgather/id3 build && pnpm --filter @showgather/presentation-model build && pnpm --filter @showgather/api db:generate && pnpm --filter @showgather/api build && pnpm --filter @showgather/admin build && pnpm --filter @showgather/player build",
     "typecheck": "pnpm -r run typecheck",
     "stream": "bash stream/scripts/generate-test-stream.sh",
     "verify": "bash stream/scripts/verify-segments.sh",
