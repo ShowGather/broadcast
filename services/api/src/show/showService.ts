@@ -34,7 +34,7 @@ function optionalConfiguration(value: unknown): Prisma.InputJsonValue | Prisma.J
   return value as Prisma.InputJsonValue;
 }
 function validateConfiguration(configuration: Record<string, unknown>) {
-  const allowed = new Set(["sport", "homeTeam", "awayTeam", "tickerLabel", "programmeTitle", "programmeSubtitle", "liveLabel", "accent", "enabledCompanionPanels", "companionPanelLabels", "viewerContext", "presentationLayouts"]);
+  const allowed = new Set(["sport", "homeTeam", "awayTeam", "tickerLabel", "programmeTitle", "programmeSubtitle", "liveLabel", "accent", "enabledCompanionPanels", "companionPanelLabels", "viewerContext", "presentationInstances", "presentationLayouts"]);
   if (Object.keys(configuration).some((key) => !allowed.has(key))) throw new Error("configuration contains an unsupported field");
   for (const key of ["sport", "homeTeam", "awayTeam", "tickerLabel", "programmeTitle", "programmeSubtitle", "liveLabel", "viewerContext"] as const) {
     if (configuration[key] !== undefined && (typeof configuration[key] !== "string" || configuration[key].trim().length === 0 || configuration[key].length > 80)) throw new Error(`${key} must be 1-80 characters`);
@@ -44,7 +44,23 @@ function validateConfiguration(configuration: Record<string, unknown>) {
   if (panels !== undefined && (!Array.isArray(panels) || panels.some((panel) => panel !== "match" && panel !== "info" && panel !== "partners" && panel !== "interact"))) throw new Error("enabledCompanionPanels contains an unsupported panel");
   const labels = configuration.companionPanelLabels;
   if (labels !== undefined && (typeof labels !== "object" || labels === null || Array.isArray(labels) || Object.entries(labels as Record<string, unknown>).some(([key, label]) => !["match", "info", "partners", "interact"].includes(key) || typeof label !== "string" || label.length === 0 || label.length > 24))) throw new Error("companionPanelLabels contains an invalid label");
+  validatePresentationInstances(configuration.presentationInstances);
   validatePresentationLayouts(configuration.presentationLayouts);
+}
+function validatePresentationInstances(value: unknown) {
+  if (value === undefined) return;
+  if (!Array.isArray(value) || value.length > 20) throw new Error("presentationInstances must contain at most 20 definitions");
+  const kinds = new Set(["lower-third", "scorebug", "ticker", "alert", "sponsor", "clock", "live-badge", "poll", "custom"]);
+  const ids = new Set<string>();
+  for (const instance of value) {
+    if (typeof instance !== "object" || instance === null || Array.isArray(instance)) throw new Error("presentationInstances contains an invalid definition");
+    const definition = instance as Record<string, unknown>;
+    if (typeof definition.id !== "string" || !/^[a-z0-9][a-z0-9-]{0,79}$/i.test(definition.id) || ids.has(definition.id)) throw new Error("presentationInstances requires unique stable IDs");
+    ids.add(definition.id);
+    if (!kinds.has(String(definition.kind))) throw new Error("presentationInstances contains an unsupported kind");
+    if (typeof definition.label !== "string" || definition.label.trim().length === 0 || definition.label.length > 80) throw new Error("presentationInstances requires a 1-80 character label");
+    if (definition.enabled !== undefined && typeof definition.enabled !== "boolean") throw new Error("presentationInstances enabled must be boolean");
+  }
 }
 function validatePresentationLayouts(value: unknown) {
   if (value === undefined) return;
@@ -60,6 +76,8 @@ function validatePresentationLayouts(value: unknown) {
     ids.add(definition.instanceId);
     for (const field of ["placementByProfile", "variantByProfile"] as const) if (definition[field] !== undefined && (typeof definition[field] !== "object" || definition[field] === null || Array.isArray(definition[field]))) throw new Error(`${field} must be an object`);
     if (definition.variantByProfile && Object.entries(definition.variantByProfile as Record<string, unknown>).some(([profile, variant]) => !profiles.has(profile) || typeof variant !== "string" || variant.length < 1 || variant.length > 32)) throw new Error("variantByProfile contains an invalid variant");
+    if (definition.zIndex !== undefined && (typeof definition.zIndex !== "number" || !Number.isSafeInteger(definition.zIndex) || definition.zIndex < 0 || definition.zIndex > 999)) throw new Error("zIndex must be an integer from 0 to 999");
+    if (definition.transition !== undefined) { const transition = definition.transition as Record<string, unknown>; if (typeof transition !== "object" || transition === null || !["cut", "fade", "slide", "scale"].includes(String(transition.enter)) || !["cut", "fade", "slide", "scale"].includes(String(transition.exit)) || !Number.isSafeInteger(transition.durationMs) || Number(transition.durationMs) < 0 || Number(transition.durationMs) > 5_000) throw new Error("transition is invalid"); }
     for (const [profile, placement] of Object.entries(definition.placementByProfile as Record<string, unknown> ?? {})) {
       if (!profiles.has(profile) || typeof placement !== "object" || placement === null || Array.isArray(placement)) throw new Error("placementByProfile contains an invalid profile");
       const item = placement as Record<string, unknown>;

@@ -125,9 +125,11 @@ test("the shared acceptance scene resolves the same instances for every profile"
 
 test("persisted layout definitions override placement without changing active state", () => {
   const state = createV13PresentationAcceptanceScene();
-  const configured = resolvePresentationTarget(state, "video.overlay", "tv", [{ instanceId: "scorebug-main", placementByProfile: { tv: { surface: "video", anchor: "bottom-right", x: .04, y: .04, width: .2, safeArea: true, layout: "overlay" } } }]);
+  const configured = resolvePresentationTarget(state, "video.overlay", "tv", [{ instanceId: "scorebug-main", placementByProfile: { tv: { surface: "video", anchor: "bottom-right", x: .04, y: .04, width: .2, safeArea: true, layout: "overlay" } }, zIndex: 99, transition: { enter: "fade", exit: "fade", durationMs: 180 } }]);
   const scorebug = configured.find((instance) => instance.entry.instanceId === "scorebug-main");
   assert.equal(scorebug?.placement.anchor, "bottom-right");
+  assert.equal(scorebug?.entry.zIndex, 99);
+  assert.deepEqual(scorebug?.transition, { enter: "fade", exit: "fade", durationMs: 180 });
   assert.equal(configured.length, resolvePresentationTarget(state, "video.overlay", "tv").length);
 });
 

@@ -11,11 +11,12 @@ interface Production { id: string; channelId: string; title: string; description
 interface Rundown { id: string; name: string; version: number; }
 interface RundownDefinitionCue { id: string; label: string; position: number; enabled: boolean; commandPayload: Record<string, unknown>; }
 interface ShowConfiguration { id: string; name: string; configuration: Record<string, unknown>; }
+interface PresentationInstanceDefinition { id: string; kind: "lower-third" | "scorebug" | "ticker" | "alert" | "sponsor" | "clock" | "live-badge" | "poll" | "custom"; label: string; enabled: boolean; }
 interface OutboxItem { id: string; eventId: string; revision: number; label: string; status: "pending" | "dispatched" | "failed" | "cancelled"; error?: string; retryable: boolean; cancellable: boolean; }
 type LayoutProfile = "desktop" | "tv" | "mobile";
 type LayoutSurface = "video" | "surround" | "companion";
 type LayoutAnchor = "top-left" | "top-centre" | "top-right" | "centre-left" | "centre" | "centre-right" | "bottom-left" | "bottom-centre" | "bottom-right";
-interface LayoutDefinition { instanceId: string; placementByProfile: Partial<Record<LayoutProfile, { surface: LayoutSurface; anchor: LayoutAnchor; x: number; y: number; width: number; safeArea?: boolean; layout: "single" | "column" | "overlay" }>>; variantByProfile?: Partial<Record<LayoutProfile, string>>; }
+interface LayoutDefinition { instanceId: string; placementByProfile: Partial<Record<LayoutProfile, { surface: LayoutSurface; anchor: LayoutAnchor; x: number; y: number; width: number; safeArea?: boolean; layout: "single" | "column" | "overlay" }>>; variantByProfile?: Partial<Record<LayoutProfile, string>>; zIndex?: number; transition?: { enter: "cut" | "fade" | "slide" | "scale"; exit: "cut" | "fade" | "slide" | "scale"; durationMs: number }; }
 
 const placementPreset = (surface: LayoutSurface, anchor: LayoutAnchor) => {
   const x = anchor.endsWith("left") || anchor.endsWith("right") ? .04 : 0;
@@ -81,6 +82,10 @@ export default function App() {
   const [partnersPanelLabel, setPartnersPanelLabel] = useState("Partners");
   const [interactPanelLabel, setInteractPanelLabel] = useState("Interact");
   const [presentationLayouts, setPresentationLayouts] = useState<LayoutDefinition[]>([]);
+  const [presentationInstances, setPresentationInstances] = useState<PresentationInstanceDefinition[]>([]);
+  const [newInstanceId, setNewInstanceId] = useState("");
+  const [newInstanceLabel, setNewInstanceLabel] = useState("");
+  const [newInstanceKind, setNewInstanceKind] = useState<PresentationInstanceDefinition["kind"]>("lower-third");
   const [layoutInstanceId, setLayoutInstanceId] = useState("scorebug");
   const [layoutProfile, setLayoutProfile] = useState<LayoutProfile>("desktop");
   const [layoutSurface, setLayoutSurface] = useState<LayoutSurface>("video");
@@ -91,6 +96,9 @@ export default function App() {
   const [layoutSafeArea, setLayoutSafeArea] = useState(true);
   const [layoutPolicy, setLayoutPolicy] = useState<"single" | "column" | "overlay">("overlay");
   const [layoutVariant, setLayoutVariant] = useState("standard");
+  const [layoutZIndex, setLayoutZIndex] = useState(10);
+  const [transitionKind, setTransitionKind] = useState<"cut" | "fade" | "slide" | "scale">("fade");
+  const [transitionDuration, setTransitionDuration] = useState(180);
   const [selectedElement, setSelectedElement] = useState("scorebug");
   const [configurations, setConfigurations] = useState<ShowConfiguration[]>([]);
   const workspace = route.workspace === "productions" ? "prepare" : route.workspace;
@@ -146,6 +154,14 @@ export default function App() {
     if (!response.ok) throw new Error("Unable to load production");
     const item = await response.json() as Production;
     setProductionTitle(item.title); setProductionDescription(item.description ?? ""); setProductionStatus(item.status);
+    const configuration = item.configuration ?? {};
+    const text = (key: string, fallback: string) => typeof configuration[key] === "string" ? configuration[key] as string : fallback;
+    setHomeTeam(text("homeTeam", "HOME")); setAwayTeam(text("awayTeam", "AWAY")); setTickerLabel(text("tickerLabel", "LIVE")); setProgrammeTitle(text("programmeTitle", "")); setProgrammeSubtitle(text("programmeSubtitle", "")); setLiveLabel(text("liveLabel", "LIVE")); setAccent(text("accent", "#73e3ff"));
+    const panels = configuration.enabledCompanionPanels; if (Array.isArray(panels) && panels.every((panel) => typeof panel === "string")) setEnabledPanels(panels as string[]);
+    const labels = configuration.companionPanelLabels as Record<string, unknown> | undefined;
+    setMatchPanelLabel(typeof labels?.match === "string" ? labels.match : "Match"); setInfoPanelLabel(typeof labels?.info === "string" ? labels.info : "Info"); setPartnersPanelLabel(typeof labels?.partners === "string" ? labels.partners : "Partners"); setInteractPanelLabel(typeof labels?.interact === "string" ? labels.interact : "Interact");
+    setPresentationLayouts(Array.isArray(configuration.presentationLayouts) ? configuration.presentationLayouts as LayoutDefinition[] : []);
+    setPresentationInstances(Array.isArray(configuration.presentationInstances) ? configuration.presentationInstances as PresentationInstanceDefinition[] : []);
   }, [productionId]);
   const reloadRundownDefinition = useCallback(async () => {
     if (!rundownId) return;
@@ -296,6 +312,7 @@ export default function App() {
   const programmePreviewUrl = channelId ? `${window.location.protocol}//${window.location.hostname}:3003/player/${encodeURIComponent(channelId)}?profile=desktop&embedded=1&productionId=${encodeURIComponent(productionId)}` : "";
   const disabledCueCount = rundown.filter((cue) => !cue.enabled).length;
   const unresolvedOutbox = outbox.filter((item) => item.status === "failed" || item.status === "pending");
+  const productionSwitchLocked = workspace === "run" && runReady;
   const enterRun = async () => {
     if (sessionId) { setRunReady(true); setStatus("Resumed the existing live session."); return; }
     const result = await mutate(`/api/rundown/live/sessions?rundownId=${encodeURIComponent(rundownId)}`, "POST", {}, "Live session started", fetchRundown);
@@ -320,8 +337,9 @@ export default function App() {
   const saveLayoutPreset = () => setPresentationLayouts((current) => {
     const placement = { ...placementPreset(layoutSurface, layoutAnchor), x: layoutX, y: layoutY, width: layoutWidth, safeArea: layoutSafeArea, layout: layoutPolicy };
     const existing = current.find((definition) => definition.instanceId === layoutInstanceId);
-    if (existing) return current.map((definition) => definition.instanceId === layoutInstanceId ? { ...definition, placementByProfile: { ...definition.placementByProfile, [layoutProfile]: placement }, variantByProfile: { ...definition.variantByProfile, [layoutProfile]: layoutVariant } } : definition);
-    return [...current, { instanceId: layoutInstanceId, placementByProfile: { [layoutProfile]: placement }, variantByProfile: { [layoutProfile]: layoutVariant } }];
+    const transition = { enter: transitionKind, exit: transitionKind, durationMs: transitionDuration };
+    if (existing) return current.map((definition) => definition.instanceId === layoutInstanceId ? { ...definition, placementByProfile: { ...definition.placementByProfile, [layoutProfile]: placement }, variantByProfile: { ...definition.variantByProfile, [layoutProfile]: layoutVariant }, zIndex: layoutZIndex, transition } : definition);
+    return [...current, { instanceId: layoutInstanceId, placementByProfile: { [layoutProfile]: placement }, variantByProfile: { [layoutProfile]: layoutVariant }, zIndex: layoutZIndex, transition }];
   });
   const duplicateLayoutDefinition = (instanceId: string) => setPresentationLayouts((current) => {
     const source = current.find((definition) => definition.instanceId === instanceId); if (!source) return current;
@@ -330,6 +348,19 @@ export default function App() {
     return [...current, { ...source, instanceId: copyId }];
   });
   const removeLayoutDefinition = (instanceId: string) => setPresentationLayouts((current) => current.filter((definition) => definition.instanceId !== instanceId));
+  const addPresentationInstance = () => {
+    const id = newInstanceId.trim().toLowerCase(); const label = newInstanceLabel.trim();
+    if (!/^[a-z0-9][a-z0-9-]{0,79}$/.test(id)) { setError("Instance ID must use letters, numbers, and hyphens."); return; }
+    if (!label) { setError("Give the presentation instance a label."); return; }
+    if (presentationInstances.some((instance) => instance.id === id)) { setError("That instance ID is already in this production."); return; }
+    setPresentationInstances((current) => [...current, { id, label, kind: newInstanceKind, enabled: true }]); setLayoutInstanceId(id); setCommandInstanceId(id); setNewInstanceId(""); setNewInstanceLabel(""); setStatus(`${label} added to the reusable instance library.`); setError("");
+  };
+  const duplicatePresentationInstance = (id: string) => setPresentationInstances((current) => {
+    const source = current.find((instance) => instance.id === id); if (!source) return current; let copyId = `${id}-copy`; let suffix = 2;
+    while (current.some((instance) => instance.id === copyId)) copyId = `${id}-copy-${suffix++}`;
+    setLayoutInstanceId(copyId); return [...current, { ...source, id: copyId, label: `${source.label} copy`, enabled: false }];
+  });
+  const removePresentationInstance = (id: string) => { setPresentationInstances((current) => current.filter((instance) => instance.id !== id)); setPresentationLayouts((current) => current.filter((layout) => layout.instanceId !== id)); };
   const chooseElement = (kind: "scorebug" | "lower-third" | "ticker" | "alert" | "sponsor-panel" | "clock") => {
     const defaults: Record<typeof kind, { instanceId: string; command?: string; surface: LayoutSurface; anchor: LayoutAnchor }> = {
       scorebug: { instanceId: "scorebug-main", command: "score", surface: "video", anchor: "top-left" },
@@ -342,8 +373,9 @@ export default function App() {
     const selected = defaults[kind];
     const placement = placementPreset(selected.surface, selected.anchor);
     setSelectedElement(kind); if (selected.command) setCommandKind(selected.command); setCommandInstanceId(selected.instanceId); setLayoutInstanceId(selected.instanceId); setLayoutSurface(selected.surface); setLayoutAnchor(selected.anchor); setLayoutX(placement.x); setLayoutY(placement.y); setLayoutWidth(placement.width); setLayoutSafeArea(placement.safeArea ?? false); setLayoutPolicy(placement.layout === "column" ? "column" : "overlay");
-    setStatus(selected.command ? `${kind} selected. Choose a profile and apply a placement preset, then configure its typed command.` : `${kind} selected. Configure its profile placement; programme clock content is currently supplied by a scene or future clock command.`);
+    setStatus(`${kind} selected. Choose a profile and apply a placement preset, then configure its typed command.`);
   };
+  const currentShowConfiguration = () => ({ sport: "football", homeTeam, awayTeam, tickerLabel, ...(programmeTitle.trim() ? { programmeTitle: programmeTitle.trim() } : {}), ...(programmeSubtitle.trim() ? { programmeSubtitle: programmeSubtitle.trim() } : {}), ...(liveLabel.trim() ? { liveLabel: liveLabel.trim() } : {}), accent, enabledCompanionPanels: enabledPanels, companionPanelLabels: { match: matchPanelLabel.trim() || "Match", info: infoPanelLabel.trim() || "Info", partners: partnersPanelLabel.trim() || "Partners", interact: interactPanelLabel.trim() || "Interact" }, ...(presentationInstances.length ? { presentationInstances } : {}), ...(presentationLayouts.length ? { presentationLayouts } : {}) });
 
   return <div className={`container workspace workspace--${workspace}`}>
     <header className="admin-shell__header"><div><a className="admin-shell__brand" href="/admin/productions" onClick={(event) => { event.preventDefault(); navigate({ workspace: "productions" }); }}>ShowGather</a><p>{workspace === "run" ? "Focused live operation" : workspace === "rehearse" ? "Safe rehearsal — no live presentation changes" : "Prepare saved productions and rundowns"}</p></div><div className="admin-shell__status"><p className={`connection connection--${apiConnection}`}>API {apiConnection}</p><p className={`connection connection--${streamConnection}`}>Stream {streamConnection}</p><button type="button" className="diagnostics-toggle" aria-expanded={diagnosticsOpen} onClick={() => setDiagnosticsOpen((open) => !open)}>{diagnosticsOpen ? "Hide diagnostics" : "Diagnostics"}</button></div></header>
@@ -358,10 +390,11 @@ export default function App() {
     <section className="section admin-context">
       <h2>{route.workspace === "productions" ? "Choose a production" : `${workspace} · ${selectedProduction?.title ?? "Loading production"}`}</h2>
       <div className="form">
-        <label><span>Channel</span><select value={channelId} onChange={(event) => setChannelId(event.target.value)}>{channels.map((channel) => <option key={channel.id} value={channel.id}>{channel.name}</option>)}</select></label>
-        <label><span>Production</span><select value={productionId} onChange={(event) => { setProductionId(event.target.value); navigate({ workspace: route.workspace === "productions" ? "prepare" : workspace, productionId: event.target.value }); }}>{productions.map((production) => <option key={production.id} value={production.id}>{production.title}</option>)}</select></label>
-        {route.workspace !== "productions" && <label><span>Rundown</span><select value={rundownId} onChange={(event) => setRundownId(event.target.value)}>{rundowns.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}</select></label>}
+        <label><span>Channel</span><select disabled={productionSwitchLocked} value={channelId} onChange={(event) => setChannelId(event.target.value)}>{channels.map((channel) => <option key={channel.id} value={channel.id}>{channel.name}</option>)}</select></label>
+        <label><span>Production</span><select disabled={productionSwitchLocked} value={productionId} onChange={(event) => { setProductionId(event.target.value); navigate({ workspace: route.workspace === "productions" ? "prepare" : workspace, productionId: event.target.value }); }}>{productions.map((production) => <option key={production.id} value={production.id}>{production.title}</option>)}</select></label>
+        {route.workspace !== "productions" && <label><span>Rundown</span><select disabled={productionSwitchLocked} value={rundownId} onChange={(event) => setRundownId(event.target.value)}>{rundowns.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}</select></label>}
       </div>
+      {productionSwitchLocked && <p className="hint">Production context is locked for this active live session. Complete or abandon the session before switching.</p>}
       {selectionError && <p className="error-msg" role="alert">{selectionError}</p>}
     </section>
 
@@ -407,19 +440,31 @@ export default function App() {
           <label><span>Partners</span><input maxLength={30} value={partnersPanelLabel} onChange={(event) => setPartnersPanelLabel(event.target.value)} /></label>
           <label><span>Interact</span><input maxLength={30} value={interactPanelLabel} onChange={(event) => setInteractPanelLabel(event.target.value)} /></label>
         </fieldset>
+        <fieldset className="panel-options"><legend>Reusable presentation instances</legend>
+          <p className="hint">Instances are named show building blocks. They can be placed differently per profile and targeted by typed cues without exposing transport data.</p>
+          <label><span>Instance ID</span><input value={newInstanceId} onChange={(event) => setNewInstanceId(event.target.value)} placeholder="presenter-b" /></label>
+          <label><span>Label</span><input value={newInstanceLabel} onChange={(event) => setNewInstanceLabel(event.target.value)} placeholder="Presenter B lower third" /></label>
+          <label><span>Component</span><select value={newInstanceKind} onChange={(event) => setNewInstanceKind(event.target.value as PresentationInstanceDefinition["kind"])}>{(["lower-third", "scorebug", "ticker", "alert", "sponsor", "clock", "live-badge", "poll", "custom"] as const).map((kind) => <option key={kind}>{kind}</option>)}</select></label>
+          <button type="button" onClick={addPresentationInstance}>Add instance</button>
+          {presentationInstances.length > 0 && <ul className="placement-summary">{presentationInstances.map((instance) => <li key={instance.id}><span><b>{instance.label}</b> · {instance.kind} · {instance.enabled ? "Enabled" : "Disabled"}</span><button type="button" onClick={() => { setLayoutInstanceId(instance.id); setCommandInstanceId(instance.id); }}>Select</button><button type="button" onClick={() => setPresentationInstances((current) => current.map((item) => item.id === instance.id ? { ...item, enabled: !item.enabled } : item))}>{instance.enabled ? "Disable" : "Enable"}</button><button type="button" onClick={() => duplicatePresentationInstance(instance.id)}>Duplicate</button><button type="button" onClick={() => removePresentationInstance(instance.id)}>Delete</button></li>)}</ul>}
+        </fieldset>
         <fieldset className="panel-options"><legend>Presentation placement presets</legend>
           <p className="hint">Choose an active presentation instance and a profile-specific destination. These settings are saved with the reusable show package.</p>
-          <label><span>Instance</span><select value={layoutInstanceId} onChange={(event) => setLayoutInstanceId(event.target.value)}><option value="scorebug">Main scorebug</option><option value="lower-third">Lower third</option><option value="primary">Sponsor panel</option><option value="ticker">Ticker</option><option value="scorebug-main">Acceptance scene scorebug</option><option value="lower-third-presenter-a">Acceptance presenter A</option><option value="lower-third-presenter-b">Acceptance presenter B</option><option value="sponsor-top-right">Acceptance sponsor</option><option value="programme-clock">Programme clock</option></select></label>
+          <label><span>Instance</span><select value={layoutInstanceId} onChange={(event) => setLayoutInstanceId(event.target.value)}><option value="scorebug">Main scorebug</option><option value="lower-third">Lower third</option><option value="primary">Sponsor panel</option><option value="ticker">Ticker</option><option value="scorebug-main">Acceptance scene scorebug</option><option value="lower-third-presenter-a">Acceptance presenter A</option><option value="lower-third-presenter-b">Acceptance presenter B</option><option value="sponsor-top-right">Acceptance sponsor</option><option value="programme-clock">Programme clock</option>{presentationInstances.map((instance) => <option key={instance.id} value={instance.id}>{instance.label}{instance.enabled ? "" : " (disabled)"}</option>)}</select></label>
           <label><span>Profile</span><select value={layoutProfile} onChange={(event) => setLayoutProfile(event.target.value as LayoutProfile)}>{(["desktop", "tv", "mobile"] as const).map((profile) => <option key={profile}>{profile}</option>)}</select></label>
           <label><span>Surface</span><select value={layoutSurface} onChange={(event) => setLayoutSurface(event.target.value as LayoutSurface)}>{(["video", "surround", "companion"] as const).map((surface) => <option key={surface}>{surface}</option>)}</select></label>
           <label><span>Preset</span><select value={layoutAnchor} onChange={(event) => setLayoutAnchor(event.target.value as LayoutAnchor)}>{(["top-left", "top-centre", "top-right", "centre-left", "centre", "centre-right", "bottom-left", "bottom-centre", "bottom-right"] as const).map((anchor) => <option key={anchor}>{anchor}</option>)}</select></label>
           <label><span>Profile variant</span><select value={layoutVariant} onChange={(event) => setLayoutVariant(event.target.value)}><option value="standard">Standard</option><option value="wide">Wide</option><option value="broadcast">Broadcast</option><option value="compact">Compact</option><option value="headline">Headline</option></select></label>
           <label><span>Horizontal offset</span><input type="number" min={0} max={1} step={.01} value={layoutX} onChange={(event) => setLayoutX(Number(event.target.value))} /></label><label><span>Vertical offset</span><input type="number" min={0} max={1} step={.01} value={layoutY} onChange={(event) => setLayoutY(Number(event.target.value))} /></label><label><span>Width</span><input type="number" min={.08} max={1} step={.01} value={layoutWidth} onChange={(event) => setLayoutWidth(Number(event.target.value))} /></label>
           <label><span>Collision policy</span><select value={layoutPolicy} onChange={(event) => setLayoutPolicy(event.target.value as "single" | "column" | "overlay")}><option value="overlay">Overlay</option><option value="column">Stack in column</option><option value="single">Single slot</option></select></label><label><span>Title/action safe area</span><input type="checkbox" checked={layoutSafeArea} onChange={(event) => setLayoutSafeArea(event.target.checked)} /></label>
+          <label><span>Layer order</span><input type="number" min={0} max={999} step={1} value={layoutZIndex} onChange={(event) => setLayoutZIndex(Number(event.target.value))} /></label>
+          <label><span>Transition</span><select value={transitionKind} onChange={(event) => setTransitionKind(event.target.value as "cut" | "fade" | "slide" | "scale")}><option value="cut">Cut</option><option value="fade">Fade</option><option value="slide">Slide</option><option value="scale">Scale</option></select></label>
+          <label><span>Transition duration (ms)</span><input type="number" min={0} max={5000} step={10} value={transitionDuration} onChange={(event) => setTransitionDuration(Number(event.target.value))} /></label>
           <button type="button" onClick={saveLayoutPreset}>Apply preset</button>
           {presentationLayouts.length > 0 && <ul className="placement-summary">{presentationLayouts.map((definition) => <li key={definition.instanceId}><span><b>{definition.instanceId}</b> · {Object.entries(definition.placementByProfile).map(([profile, placement]) => `${profile}: ${placement?.surface} ${placement?.anchor}`).join(" · ")}</span><button type="button" onClick={() => { setLayoutInstanceId(definition.instanceId); setStatus(`${definition.instanceId} selected for placement editing.`); }}>Edit</button><button type="button" onClick={() => duplicateLayoutDefinition(definition.instanceId)}>Duplicate</button><button type="button" onClick={() => removeLayoutDefinition(definition.instanceId)}>Remove</button></li>)}</ul>}
         </fieldset>
-        <button onClick={() => mutate(`/api/channels/${channelId}/show-configurations`, "POST", { name: configurationName, configuration: { sport: "football", homeTeam, awayTeam, tickerLabel, ...(programmeTitle.trim() ? { programmeTitle: programmeTitle.trim() } : {}), ...(programmeSubtitle.trim() ? { programmeSubtitle: programmeSubtitle.trim() } : {}), ...(liveLabel.trim() ? { liveLabel: liveLabel.trim() } : {}), accent, enabledCompanionPanels: enabledPanels, companionPanelLabels: { match: matchPanelLabel.trim() || "Match", info: infoPanelLabel.trim() || "Info", partners: partnersPanelLabel.trim() || "Partners", interact: interactPanelLabel.trim() || "Interact" }, ...(presentationLayouts.length ? { presentationLayouts } : {}) } }, "Show configuration saved", reloadConfigurations)}>Save reusable configuration</button>
+        <button disabled={!productionId} onClick={() => mutate(`/api/productions/${productionId}`, "PUT", { configuration: currentShowConfiguration() }, "Production presentation saved", reloadProduction)}>Save into this production</button>
+        <button onClick={() => mutate(`/api/channels/${channelId}/show-configurations`, "POST", { name: configurationName, configuration: currentShowConfiguration() }, "Show configuration saved", reloadConfigurations)}>Save reusable configuration</button>
         <label><span>Copy into production</span><select onChange={(event) => { if (event.target.value) mutate(`/api/productions/${productionId}/copy-configuration`, "POST", { configurationId: event.target.value }, "Configuration copied into production", reloadProduction); }} defaultValue=""><option value="">Choose a saved package</option>{configurations.map((configuration) => <option key={configuration.id} value={configuration.id}>{configuration.name}</option>)}</select></label>
       </div>
       <p className="hint">Packages are copied into a production deliberately. Changing a package never rewrites an existing production.</p></div>

@@ -33,6 +33,8 @@ export interface PresentationLayoutDefinition {
   instanceId: string;
   placementByProfile?: PlacementByProfile;
   variantByProfile?: VariantByProfile;
+  zIndex?: number;
+  transition?: PresentationTransition;
 }
 export interface PresentationTransition {
   enter: PresentationTransitionKind;
@@ -87,10 +89,10 @@ export function resolvePresentationInstance(entry: PresentationEntry, profile: V
   const definition = definitions.find((candidate) => candidate.instanceId === entry.instanceId);
   const placement = entry.placementByProfile?.[profile] ?? definition?.placementByProfile?.[profile] ?? defaultPlacement(entry.item, entry.region, profile);
   return {
-    entry,
+    entry: { ...entry, ...(definition?.zIndex === undefined ? {} : { zIndex: definition.zIndex }) },
     placement: normalisePlacement(placement),
     variant: entry.variantByProfile?.[profile] ?? definition?.variantByProfile?.[profile] ?? defaultVariant(entry.item, profile),
-    transition: entry.transition ?? defaultTransition,
+    transition: entry.transition ?? definition?.transition ?? defaultTransition,
     stackIndex: 0,
   };
 }

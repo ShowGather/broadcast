@@ -47,11 +47,13 @@ test("profile-aware layout definitions are persisted as bounded production confi
   const data = await fixture();
   try {
     const show = new ShowService(prisma!);
-    const configuration = { presentationLayouts: [{ instanceId: "scorebug", placementByProfile: { tv: { surface: "video", anchor: "top-left", x: .04, y: .04, width: .28, safeArea: true, layout: "overlay" } } }] };
+    const configuration = { presentationInstances: [{ id: "scorebug-main", kind: "scorebug", label: "Main scorebug", enabled: true }], presentationLayouts: [{ instanceId: "scorebug-main", placementByProfile: { tv: { surface: "video", anchor: "top-left", x: .04, y: .04, width: .28, safeArea: true, layout: "overlay" } }, zIndex: 20, transition: { enter: "fade", exit: "fade", durationMs: 180 } }] };
     const production = await show.createProduction(data.channel.id, { title: "Match", configuration });
     const saved = await prisma!.production.findUniqueOrThrow({ where: { id: production.id } });
     assert.deepEqual(saved.configuration, configuration);
     await assert.rejects(() => show.updateProduction(production.id, { configuration: { presentationLayouts: [{ instanceId: "bad layout", placementByProfile: {} }] } }), /stable instance IDs/);
+    await assert.rejects(() => show.updateProduction(production.id, { configuration: { presentationLayouts: [{ instanceId: "scorebug", placementByProfile: {}, zIndex: 1000 }] } }), /zIndex/);
+    await assert.rejects(() => show.updateProduction(production.id, { configuration: { presentationInstances: [{ id: "bad instance", kind: "scorebug", label: "Bad", enabled: true }] } }), /stable IDs/);
   } finally { await data.remove(); }
 });
 
