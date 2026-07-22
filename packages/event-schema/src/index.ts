@@ -58,11 +58,11 @@ export interface PresentationClearEvent {
 
 /** Compact, configurable command payload carried directly in timed metadata. */
 export type PresentationCommandPayload =
-  | { k: "score"; h: number; a: number; l?: string }
-  | { k: "lower"; t: string; s?: string; d?: number }
-  | { k: "alert"; t: string; m: string; x?: "i" | "w" | "c"; d?: number }
-  | { k: "sponsor"; b: string; s?: string; d?: number }
-  | { k: "ticker"; t: string; l?: string }
+  | { k: "score"; h: number; a: number; l?: string; i?: string }
+  | { k: "lower"; t: string; s?: string; d?: number; i?: string }
+  | { k: "alert"; t: string; m: string; x?: "i" | "w" | "c"; d?: number; i?: string }
+  | { k: "sponsor"; b: string; s?: string; d?: number; i?: string }
+  | { k: "ticker"; t: string; l?: string; i?: string }
   | { k: "clear"; g?: "v" | "h" | "l" | "r" | "f"; y?: string }
   /** Ordered cancellation resolution: advances a durable revision without changing presentation. */
   | { k: "noop" };
@@ -149,22 +149,24 @@ export function validatePresentationCommandPayload(data: unknown): PresentationC
   const p = data as Record<string, unknown>;
   const duration = validDuration(p.d) ? p.d : undefined;
   if (p.d !== undefined && duration === undefined) return null;
+  const instance = validInstanceId(p.i) ? p.i : undefined;
+  if (p.i !== undefined && instance === undefined) return null;
   switch (p.k) {
     case "score":
       return validScore(p.h) && validScore(p.a) && optionalText(p.l, 12)
-        ? { k: "score", h: p.h, a: p.a, ...(typeof p.l === "string" ? { l: p.l } : {}) } : null;
+        ? { k: "score", h: p.h, a: p.a, ...(typeof p.l === "string" ? { l: p.l } : {}), ...(instance ? { i: instance } : {}) } : null;
     case "lower":
       return text(p.t, 20) && optionalText(p.s, 20)
-        ? { k: "lower", t: p.t, ...(typeof p.s === "string" ? { s: p.s } : {}), ...(duration !== undefined ? { d: duration } : {}) } : null;
+        ? { k: "lower", t: p.t, ...(typeof p.s === "string" ? { s: p.s } : {}), ...(duration !== undefined ? { d: duration } : {}), ...(instance ? { i: instance } : {}) } : null;
     case "alert":
       return text(p.t, 20) && text(p.m, 20) && (p.x === undefined || p.x === "i" || p.x === "w" || p.x === "c")
-        ? { k: "alert", t: p.t, m: p.m, ...(p.x !== undefined ? { x: p.x } : {}), ...(duration !== undefined ? { d: duration } : {}) } : null;
+        ? { k: "alert", t: p.t, m: p.m, ...(p.x !== undefined ? { x: p.x } : {}), ...(duration !== undefined ? { d: duration } : {}), ...(instance ? { i: instance } : {}) } : null;
     case "sponsor":
       return text(p.b, 20) && optionalText(p.s, 20)
-        ? { k: "sponsor", b: p.b, ...(typeof p.s === "string" ? { s: p.s } : {}), ...(duration !== undefined ? { d: duration } : {}) } : null;
+        ? { k: "sponsor", b: p.b, ...(typeof p.s === "string" ? { s: p.s } : {}), ...(duration !== undefined ? { d: duration } : {}), ...(instance ? { i: instance } : {}) } : null;
     case "ticker":
       return text(p.t, 20) && optionalText(p.l, 12)
-        ? { k: "ticker", t: p.t, ...(typeof p.l === "string" ? { l: p.l } : {}) } : null;
+        ? { k: "ticker", t: p.t, ...(typeof p.l === "string" ? { l: p.l } : {}), ...(instance ? { i: instance } : {}) } : null;
     case "clear":
       return (p.g === undefined || p.g === "v" || p.g === "h" || p.g === "l" || p.g === "r" || p.g === "f") && optionalText(p.y, 16)
         ? { k: "clear", ...(p.g !== undefined ? { g: p.g } : {}), ...(typeof p.y === "string" ? { y: p.y } : {}) } : null;
@@ -178,6 +180,7 @@ export function validatePresentationCommandPayload(data: unknown): PresentationC
 function text(value: unknown, maxBytes: number): value is string {
   return typeof value === "string" && value.length > 0 && new TextEncoder().encode(value).byteLength <= maxBytes;
 }
+function validInstanceId(value: unknown): value is string { return typeof value === "string" && /^[a-z0-9][a-z0-9-]{0,23}$/i.test(value); }
 function optionalText(value: unknown, maxBytes: number): boolean {
   return value === undefined || text(value, maxBytes);
 }

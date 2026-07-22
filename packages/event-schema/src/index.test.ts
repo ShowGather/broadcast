@@ -21,6 +21,13 @@ test("accepts a compact configurable score command", () => {
   });
 });
 
+test("accepts a compact stable instance reference", () => {
+  assert.deepEqual(validateEvent({ v: 1, id: "evt-instance", t: "pc", p: { k: "lower", t: "Presenter", i: "lower-third-a" } }), {
+    v: 1, id: "evt-instance", t: "pc", p: { k: "lower", t: "Presenter", i: "lower-third-a" },
+  });
+  assert.equal(validateEvent({ v: 1, id: "evt-instance-bad", t: "pc", p: { k: "lower", t: "Presenter", i: "not valid" } }), null);
+});
+
 test("rejects a configurable command that exceeds compact text bounds", () => {
   assert.equal(validateEvent({ v: 1, id: "evt-long", t: "pc", p: { k: "ticker", t: "x".repeat(21) } }), null);
 });
@@ -38,5 +45,10 @@ test("keeps a goal cue within the POC ID3 payload limit", () => {
 
 test("keeps a maximal configurable alert within the POC ID3 payload limit", () => {
   const encoded = encodeEvent({ v: 1, id: "evt-abcdefgh", t: "pc", p: { k: "alert", t: "x".repeat(20), m: "y".repeat(20), x: "c", d: 8_000 } });
+  assert.ok(new TextEncoder().encode(encoded).byteLength <= 127);
+});
+
+test("keeps an instance-targeted command within the POC ID3 payload limit", () => {
+  const encoded = encodeEvent({ v: 1, id: "evt-abcdefgh", t: "pc", p: { k: "lower", t: "Presenter", s: "Commentator", d: 8_000, i: "lower-third-presenter-a" } });
   assert.ok(new TextEncoder().encode(encoded).byteLength <= 127);
 });
