@@ -74,7 +74,8 @@ allocated.
 - The V1 dispatcher assumes one active API dispatcher process per database. A
   production deployment needs row-level outbox claiming/leases, likely using
   `SELECT ... FOR UPDATE SKIP LOCKED`.
-- Admin has focused channel, production, and rundown selectors; it does not yet
-  provide organisation management or broad CRUD editing.
+- Admin provides focused production, reusable configuration, rundown and cue
+  editing. Organisation management, accounts and multi-user collaboration are
+  still out of scope.
 - Rehearsal execution records persist, but rehearsal commands remain SSE-only
   and never write live snapshots or live outbox rows.
