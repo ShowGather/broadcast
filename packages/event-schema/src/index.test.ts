@@ -28,6 +28,12 @@ test("accepts a compact stable instance reference", () => {
   assert.equal(validateEvent({ v: 1, id: "evt-instance-bad", t: "pc", p: { k: "lower", t: "Presenter", i: "not valid" } }), null);
 });
 
+test("accepts a compact instance-targeted programme clock", () => {
+  assert.deepEqual(validateEvent({ v: 1, id: "evt-clock", t: "pc", p: { k: "clock", t: "78:42", l: "LIVE", i: "programme-clock" } }), {
+    v: 1, id: "evt-clock", t: "pc", p: { k: "clock", t: "78:42", l: "LIVE", i: "programme-clock" },
+  });
+});
+
 test("rejects a configurable command that exceeds compact text bounds", () => {
   assert.equal(validateEvent({ v: 1, id: "evt-long", t: "pc", p: { k: "ticker", t: "x".repeat(21) } }), null);
 });
