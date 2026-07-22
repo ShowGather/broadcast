@@ -230,6 +230,7 @@ export default function App() {
       : commandKind === "alert" ? { k: "alert", t: primary.trim(), m: secondary.trim(), x: "w", ...(duration ? { d: duration } : {}), ...instance }
       : commandKind === "sponsor" ? { k: "sponsor", b: primary.trim(), ...(secondary.trim() ? { s: secondary.trim() } : {}), ...(duration ? { d: duration } : {}), ...instance }
       : commandKind === "ticker" ? { k: "ticker", t: primary.trim(), ...(label.trim() ? { l: label.trim() } : {}), ...instance }
+      : commandKind === "clock" ? { k: "clock", t: primary.trim(), ...(label.trim() ? { l: label.trim() } : {}), ...instance }
       : { k: "clear", ...(primary ? { g: primary } : {}), ...(secondary.trim() ? { y: secondary.trim() } : {}) };
   };
   const sendCommand = () => send({ command: currentCommand() }, `${commandKind} command sent`);
@@ -319,7 +320,7 @@ export default function App() {
       ticker: { instanceId: "ticker-main", command: "ticker", surface: "surround", anchor: "bottom-centre" },
       alert: { instanceId: "alert-main", command: "alert", surface: "video", anchor: "centre" },
       "sponsor-panel": { instanceId: "sponsor-top-right", command: "sponsor", surface: "surround", anchor: "top-right" },
-      clock: { instanceId: "programme-clock", surface: "video", anchor: "top-centre" },
+      clock: { instanceId: "programme-clock", command: "clock", surface: "video", anchor: "top-centre" },
     };
     const selected = defaults[kind];
     setSelectedElement(kind); if (selected.command) setCommandKind(selected.command); setCommandInstanceId(selected.instanceId); setLayoutInstanceId(selected.instanceId); setLayoutSurface(selected.surface); setLayoutAnchor(selected.anchor);
@@ -455,7 +456,7 @@ export default function App() {
       <h2>Configurable presentation command</h2>
       <div className="form">
         <label><span>Action</span><select value={commandKind} onChange={(event) => { setCommandKind(event.target.value); setPrimary(""); setSecondary(""); setLabel(""); }}>
-          <option value="score">Score update</option><option value="lower">Lower third</option><option value="alert">Alert</option><option value="sponsor">Sponsor takeover</option><option value="ticker">Ticker update</option><option value="clear">Regional clear</option>
+          <option value="score">Score update</option><option value="lower">Lower third</option><option value="alert">Alert</option><option value="sponsor">Sponsor takeover</option><option value="ticker">Ticker update</option><option value="clock">Programme clock</option><option value="clear">Regional clear</option>
         </select></label>
         {commandKind !== "clear" && <label><span>Presentation instance (optional)</span><input value={commandInstanceId} maxLength={24} pattern="[A-Za-z0-9][A-Za-z0-9-]*" onChange={(event) => setCommandInstanceId(event.target.value)} placeholder="scorebug-main" /></label>}
         {commandKind === "score" ? <><label><span>Home score</span><input type="number" min={0} max={999} value={primary} onChange={(event) => setPrimary(event.target.value)} /></label><label><span>Away score</span><input type="number" min={0} max={999} value={secondary} onChange={(event) => setSecondary(event.target.value)} /></label><label><span>Label</span><input value={label} maxLength={12} onChange={(event) => setLabel(event.target.value)} placeholder="GOAL" /></label></>

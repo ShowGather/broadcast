@@ -63,6 +63,7 @@ export type PresentationCommandPayload =
   | { k: "alert"; t: string; m: string; x?: "i" | "w" | "c"; d?: number; i?: string }
   | { k: "sponsor"; b: string; s?: string; d?: number; i?: string }
   | { k: "ticker"; t: string; l?: string; i?: string }
+  | { k: "clock"; t: string; l?: string; i?: string }
   | { k: "clear"; g?: "v" | "h" | "l" | "r" | "f"; y?: string }
   /** Ordered cancellation resolution: advances a durable revision without changing presentation. */
   | { k: "noop" };
@@ -167,6 +168,9 @@ export function validatePresentationCommandPayload(data: unknown): PresentationC
     case "ticker":
       return text(p.t, 20) && optionalText(p.l, 12)
         ? { k: "ticker", t: p.t, ...(typeof p.l === "string" ? { l: p.l } : {}), ...(instance ? { i: instance } : {}) } : null;
+    case "clock":
+      return text(p.t, 12) && optionalText(p.l, 12)
+        ? { k: "clock", t: p.t, ...(typeof p.l === "string" ? { l: p.l } : {}), ...(instance ? { i: instance } : {}) } : null;
     case "clear":
       return (p.g === undefined || p.g === "v" || p.g === "h" || p.g === "l" || p.g === "r" || p.g === "f") && optionalText(p.y, 16)
         ? { k: "clear", ...(p.g !== undefined ? { g: p.g } : {}), ...(typeof p.y === "string" ? { y: p.y } : {}) } : null;
