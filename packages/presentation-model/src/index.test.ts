@@ -133,6 +133,12 @@ test("persisted layout definitions override placement without changing active st
   assert.equal(configured.length, resolvePresentationTarget(state, "video.overlay", "tv").length);
 });
 
+test("legacy snapshot entries without an instance ID use their layer as a stable fallback", () => {
+  const legacy = { "video.overlay": [{ eventId: "legacy-score", layer: "scorebug", priority: 10, activatedAtPts: 1, targetPts: 1, item: { kind: "scorebug" as const, homeTeam: "HOME", homeScore: "1", awayTeam: "AWAY", awayScore: "0" } }], header: [], "left.rail": [], "right.rail": [], footer: [] };
+  const resolved = resolvePresentationTarget(legacy, "video.overlay", "desktop");
+  assert.equal(resolved[0]?.entry.instanceId, "scorebug");
+});
+
 test("column placements stack deterministically while overlay placements retain z-order", () => {
   let state = createPresentationState();
   for (const id of ["a", "b"]) state = applyPresentationCommand(state, { action: "activate", eventId: id, targetPts: 1, region: "video.overlay", layer: "lower", instanceId: id, item: { kind: "lower-third", title: id }, placementByProfile: { desktop: { surface: "video", anchor: "bottom-left", x: .04, y: .04, width: .4, safeArea: true, layout: "column" } } });

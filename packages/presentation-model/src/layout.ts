@@ -86,10 +86,11 @@ export function placementFromPreset(surface: PresentationSurface, anchor: Presen
 }
 
 export function resolvePresentationInstance(entry: PresentationEntry, profile: ViewerProfile, definitions: readonly PresentationLayoutDefinition[] = []): ResolvedPresentationInstance {
-  const definition = definitions.find((candidate) => candidate.instanceId === entry.instanceId);
+  const instanceId = entry.instanceId ?? entry.layer;
+  const definition = definitions.find((candidate) => candidate.instanceId === instanceId);
   const placement = entry.placementByProfile?.[profile] ?? definition?.placementByProfile?.[profile] ?? defaultPlacement(entry.item, entry.region, profile);
   return {
-    entry: { ...entry, ...(definition?.zIndex === undefined ? {} : { zIndex: definition.zIndex }) },
+    entry: { ...entry, instanceId, ...(definition?.zIndex === undefined ? {} : { zIndex: definition.zIndex }) },
     placement: normalisePlacement(placement),
     variant: entry.variantByProfile?.[profile] ?? definition?.variantByProfile?.[profile] ?? defaultVariant(entry.item, profile),
     transition: entry.transition ?? definition?.transition ?? defaultTransition,

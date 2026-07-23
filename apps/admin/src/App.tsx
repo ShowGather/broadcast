@@ -110,7 +110,8 @@ export default function App() {
   const [elementsOpen, setElementsOpen] = useState(true);
   const [deckPinned, setDeckPinned] = useState(false);
   const [configurations, setConfigurations] = useState<ShowConfiguration[]>([]);
-  const workspace = route.workspace === "productions" ? "prepare" : route.workspace;
+  const isProductionsHome = route.workspace === "productions";
+  const workspace = isProductionsHome ? "prepare" : route.workspace;
   const prepareTab = route.prepareTab ?? "overview";
   const rehearsal = workspace === "rehearse";
   const navigate = useCallback((next: AdminRoute, replace = false) => {
@@ -392,17 +393,18 @@ export default function App() {
   };
   const currentShowConfiguration = () => ({ sport: "football", homeTeam, awayTeam, tickerLabel, ...(programmeTitle.trim() ? { programmeTitle: programmeTitle.trim() } : {}), ...(programmeSubtitle.trim() ? { programmeSubtitle: programmeSubtitle.trim() } : {}), ...(liveLabel.trim() ? { liveLabel: liveLabel.trim() } : {}), accent, enabledCompanionPanels: enabledPanels, companionPanelLabels: { match: matchPanelLabel.trim() || "Match", info: infoPanelLabel.trim() || "Info", partners: partnersPanelLabel.trim() || "Partners", interact: interactPanelLabel.trim() || "Interact" }, ...(presentationInstances.length ? { presentationInstances } : {}), ...(presentationLayouts.length ? { presentationLayouts } : {}) });
 
-  return <div className={`container workspace workspace--${workspace}`}>
-    <header className="admin-shell__header"><div><a className="admin-shell__brand" href="/admin/productions" onClick={(event) => { event.preventDefault(); navigate({ workspace: "productions" }); }}>ShowGather</a><p>{workspace === "run" ? "Focused live operation" : workspace === "rehearse" ? "Safe rehearsal — no live presentation changes" : "Prepare saved productions and rundowns"}</p></div><div className="admin-shell__status"><p className={`connection connection--${apiConnection}`}>API {apiConnection}</p><p className={`connection connection--${streamConnection}`}>Stream {streamConnection}</p><button type="button" className="diagnostics-toggle" aria-expanded={diagnosticsOpen} onClick={() => setDiagnosticsOpen((open) => !open)}>{diagnosticsOpen ? "Hide diagnostics" : "Diagnostics"}</button></div></header>
+  const studioRundown = workspace === "prepare" && prepareTab === "rundown";
+  return <div className={`container workspace workspace--${workspace}${studioRundown ? " workspace--prepare-rundown" : ""}`}>
+    <header className="admin-shell__header"><div><a className="admin-shell__brand" href="/admin/productions" onClick={(event) => { event.preventDefault(); navigate({ workspace: "productions" }); }}>ShowGather</a><p>{isProductionsHome ? "Choose or create a saved production" : workspace === "run" ? "Focused live operation" : workspace === "rehearse" ? "Safe rehearsal — no live presentation changes" : "Prepare saved productions and rundowns"}</p></div><div className="admin-shell__status"><p className={`connection connection--${apiConnection}`}>API {apiConnection}</p><p className={`connection connection--${streamConnection}`}>Stream {streamConnection}</p><button type="button" className="diagnostics-toggle" aria-expanded={diagnosticsOpen} onClick={() => setDiagnosticsOpen((open) => !open)}>{diagnosticsOpen ? "Hide diagnostics" : "Diagnostics"}</button></div></header>
     <nav className="admin-shell__nav" aria-label="Production workspace">
       <button className={route.workspace === "productions" ? "active" : ""} onClick={() => navigate({ workspace: "productions" })}>Productions</button>
       {(["prepare", "rehearse", "run"] as const).map((item) => <button key={item} disabled={!productionId} className={workspace === item ? "active" : ""} onClick={() => navigate({ workspace: item, productionId })}>{item}</button>)}
     </nav>
 
-    {workspace === "prepare" && <nav className="prepare-tabs" aria-label="Prepare workspace sections">{(["overview", "rundown", "viewer", "configuration"] as PrepareTab[]).map((tab) => <button key={tab} className={(route.prepareTab ?? "overview") === tab ? "active" : ""} onClick={() => navigate({ workspace: "prepare", productionId, prepareTab: tab })}>{tab === "configuration" ? "Show configuration" : tab}</button>)}</nav>}
+    {!isProductionsHome && workspace === "prepare" && <nav className="prepare-tabs" aria-label="Prepare workspace sections">{(["overview", "rundown", "viewer", "configuration"] as PrepareTab[]).map((tab) => <button key={tab} className={(route.prepareTab ?? "overview") === tab ? "active" : ""} onClick={() => navigate({ workspace: "prepare", productionId, prepareTab: tab })}>{tab === "configuration" ? "Show configuration" : tab}</button>)}</nav>}
     {workspace === "rehearse" && <section className="rehearsal-banner" role="status"><strong>REHEARSAL OUTPUT ONLY</strong><span>Changes are visible only in opted-in rehearsal Players. Live presentation state will not change.</span></section>}
 
-    <section className="section admin-context">
+    {!isProductionsHome && <section className="section admin-context">
       <h2>{route.workspace === "productions" ? "Choose a production" : `${workspace} · ${selectedProduction?.title ?? "Loading production"}`}</h2>
       <div className="form">
         <label><span>Channel</span><select disabled={productionSwitchLocked} value={channelId} onChange={(event) => setChannelId(event.target.value)}>{channels.map((channel) => <option key={channel.id} value={channel.id}>{channel.name}</option>)}</select></label>
@@ -411,7 +413,7 @@ export default function App() {
       </div>
       {productionSwitchLocked && <p className="hint">Production context is locked for this active live session. Complete or abandon the session before switching.</p>}
       {selectionError && <p className="error-msg" role="alert">{selectionError}</p>}
-    </section>
+    </section>}
 
     {route.workspace === "productions" && <section className="section productions-home">
       <div className="workspace-heading"><div><h2>Productions</h2><p className="hint">Open a saved production to prepare, rehearse, or run it. Technical delivery details remain outside this starting view.</p></div><button onClick={() => createProduction(true)} disabled={!channelId}>New production</button></div>
@@ -422,13 +424,13 @@ export default function App() {
         })}</div>}
     </section>}
 
-    {workspace === "prepare" && <><section className={`section elements-panel${elementsOpen ? "" : " elements-panel--collapsed"}`} hidden={prepareTab !== "rundown"}>
+    {!isProductionsHome && workspace === "prepare" && <><section className={`section elements-panel${elementsOpen ? "" : " elements-panel--collapsed"}`} hidden={prepareTab !== "configuration"}>
       <div className="workspace-heading"><div><h2>Elements</h2><p className="hint">Choose a presentation source to target its stable instance, suggested command, and placement preset.</p></div><button type="button" className="elements-panel__toggle" aria-expanded={elementsOpen} onClick={() => setElementsOpen((open) => !open)}>{elementsOpen ? "Collapse" : "Open elements"}</button></div>
       {elementsOpen && <div className="element-library" role="list" aria-label="Presentation elements">
         {(["scorebug", "lower-third", "ticker", "alert", "sponsor-panel", "clock"] as const).map((kind) => <button key={kind} type="button" role="listitem" draggable className={selectedElement === kind ? "active" : ""} onDragStart={(event) => { event.dataTransfer.setData("application/x-showgather-element", kind); event.dataTransfer.effectAllowed = "copy"; }} onClick={() => chooseElement(kind)}>{kind === "sponsor-panel" ? "Sponsor bug" : kind.replace("-", " ")}</button>)}
       </div>}
       {elementsOpen && <div className="placement-zones" aria-label="Video placement presets"><span>Drag an element onto a named placement preset</span><div>{(["top-left", "top-centre", "top-right", "centre-left", "centre", "centre-right", "bottom-left", "bottom-centre", "bottom-right"] as const).map((anchor) => <button key={anchor} type="button" onDragOver={(event) => event.preventDefault()} onDrop={(event) => { event.preventDefault(); const kind = event.dataTransfer.getData("application/x-showgather-element"); if (["scorebug", "lower-third", "ticker", "alert", "sponsor-panel", "clock"].includes(kind)) dropElementOnPreset(kind as "scorebug" | "lower-third" | "ticker" | "alert" | "sponsor-panel" | "clock", anchor); }} onClick={() => dropElementOnPreset(selectedElement as "scorebug" | "lower-third" | "ticker" | "alert" | "sponsor-panel" | "clock", anchor)}>{anchor.replace("-", " ")}</button>)}</div></div>}
-    </section><section className="section">
+    </section><section className="section prepare-content" hidden={prepareTab === "rundown" || prepareTab === "viewer"}>
       <div hidden={prepareTab !== "overview"} className="prepare-overview">
       <div>
       <h2>Production editor</h2>
@@ -487,12 +489,12 @@ export default function App() {
       <p className="hint">Packages are copied into a production deliberately. Changing a package never rewrites an existing production.</p></div>
     </section>
 
-    <section className="section rehearsal-preview" hidden={prepareTab !== "viewer"}>
+    <section className="section rehearsal-preview studio-preview" hidden={prepareTab !== "viewer" && prepareTab !== "rundown"}>
       <div className="workspace-heading"><div><h2>Placement preview</h2><p className="hint">The real Player renders the shared multi-instance scene using this production's saved layout configuration. This preview never changes live presentation state.</p></div><div className="profile-picker" role="group" aria-label="Placement preview profile">{(["desktop", "mobile", "tv"] as const).map((profile) => <button key={profile} className={previewProfile === profile ? "active" : ""} onClick={() => setPreviewProfile(profile)}>{profile}</button>)}</div></div>
       {layoutPreviewUrl ? <iframe title={`Placement Player ${previewProfile} preview`} src={layoutPreviewUrl} className={`player-preview player-preview--${previewProfile}`} /> : <p className="empty">Choose a channel to load the preview.</p>}
     </section>
 
-    <section className="section" hidden={prepareTab !== "rundown"}>
+    <section className="section rundown-editor" hidden={prepareTab !== "rundown"}>
       <h2>Rundown editor</h2>
       <div className="form"><label><span>Rundown name</span><input value={rundownName} onChange={(event) => setRundownName(event.target.value)} /></label><button disabled={!productionId} onClick={async () => { const result = await mutate(`/api/productions/${productionId}/rundowns`, "POST", { name: rundownName || "New rundown" }, "Rundown created"); if (result?.id) { setRundowns(await (await fetch(`/api/productions/${productionId}/rundowns`)).json() as Rundown[]); setRundownId(result.id); } }}>Create rundown</button><button disabled={!rundownId} onClick={() => mutate(`/api/rundowns/${rundownId}`, "PUT", { name: rundownName }, "Rundown saved", reloadRundownDefinition)}>Save rundown</button><button disabled={!rundownId} onClick={async () => { const result = await mutate(`/api/rundowns/${rundownId}/duplicate`, "POST", {}, "Rundown duplicated"); if (result?.id) { setRundowns(await (await fetch(`/api/productions/${productionId}/rundowns`)).json() as Rundown[]); setRundownId(result.id); } }}>Duplicate rundown</button></div>
       {rundownDefinition.map((cue, index) => <div className="cue-grid" key={cue.id}><strong>{cue.position}. {cue.label}</strong><span className="hint">{String(cue.commandPayload.k)} {cue.enabled ? "enabled" : "disabled"}</span><button onClick={() => editCue(cue, { enabled: !cue.enabled })}>{cue.enabled ? "Disable" : "Enable"}</button><button disabled={index === 0} onClick={() => moveCue(index, -1)}>Move up</button><button disabled={index === rundownDefinition.length - 1} onClick={() => moveCue(index, 1)}>Move down</button></div>)}
@@ -562,7 +564,7 @@ export default function App() {
       <p className="hint">Text is byte-bounded for the compact timed-ID3 envelope. Score, ticker, persistent sponsor, and clear update the late-join snapshot.</p>
     </section>}
 
-    {workspace === "prepare" && <section className="section" hidden={prepareTab !== "rundown"}>
+    {workspace === "prepare" && <section className="section legacy-overlay" hidden={prepareTab !== "rundown" || !diagnosticsOpen}>
       <h2>Custom legacy overlay</h2>
       <div className="form">
         <label><span>Title</span><input value={title} onChange={(event) => setTitle(event.target.value)} placeholder="e.g. Goal!" /></label>
