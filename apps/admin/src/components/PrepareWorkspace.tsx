@@ -1,22 +1,16 @@
-import type { AdminRoute } from "../routing.js";
 import type { useShowConfiguration } from "../hooks/useShowConfiguration.js";
 import type { useRundownEditor } from "../hooks/useRundownEditor.js";
 import type { useCommandBuilder } from "../hooks/useCommandBuilder.js";
+import { useAdminState } from "./AdminStateContext.js";
 
 interface Props {
   prepareTab: string;
   showConfig: ReturnType<typeof useShowConfiguration>;
   rundownEditor: ReturnType<typeof useRundownEditor>;
   commandBuilder: ReturnType<typeof useCommandBuilder>;
-  productionId: string;
-  rundownId: string;
   setRundownId: (id: string) => void;
-  mutate: (url: string, method: "POST" | "PUT", body: Record<string, unknown>, success: string, reload?: () => Promise<void>) => Promise<{ id?: string } | undefined>;
-  setStatus: (s: string) => void;
-  setError: (e: string) => void;
   selectedProduction: { configuration?: unknown } | undefined;
   disabledCueCount: number;
-  navigate: (route: AdminRoute, replace?: boolean) => void;
   createProduction: () => Promise<void>;
   duplicateProduction: () => Promise<void>;
   refreshRundowns: () => Promise<void>;
@@ -25,7 +19,8 @@ interface Props {
   layoutPreviewUrl: string;
 }
 
-export function PrepareWorkspace({ prepareTab, showConfig, rundownEditor, commandBuilder, productionId, rundownId, setRundownId, mutate, setStatus, setError, selectedProduction, disabledCueCount, navigate, createProduction, duplicateProduction, refreshRundowns, previewProfile, setPreviewProfile, layoutPreviewUrl }: Props) {
+export function PrepareWorkspace({ prepareTab, showConfig, rundownEditor, commandBuilder, setRundownId, selectedProduction, disabledCueCount, createProduction, duplicateProduction, refreshRundowns, previewProfile, setPreviewProfile, layoutPreviewUrl }: Props) {
+  const { productionId, rundownId, navigate, mutate, setStatus, setError } = useAdminState();
   return <>
     <section className={`section elements-panel${showConfig.elementsOpen ? "" : " elements-panel--collapsed"}`} hidden={prepareTab !== "configuration"}>
       <div className="workspace-heading"><div><h2>Elements</h2><p className="hint">Choose a presentation source to target its stable instance, suggested command, and placement preset.</p></div><button type="button" className="elements-panel__toggle" aria-expanded={showConfig.elementsOpen} onClick={() => showConfig.setElementsOpen((open) => !open)}>{showConfig.elementsOpen ? "Collapse" : "Open elements"}</button></div>

@@ -1,20 +1,17 @@
 import type { Channel, Production, Rundown } from "../types.js";
-import type { AdminRoute } from "../routing.js";
+import { useAdminState } from "./AdminStateContext.js";
 
 interface Props {
   channels: Channel[];
   productions: Production[];
   rundowns: Rundown[];
-  productionId: string;
-  channelId: string;
   setProductionId: (id: string) => void;
-  navigate: (route: AdminRoute, replace?: boolean) => void;
   createProduction: (fresh?: boolean) => Promise<void>;
-  mutate: (url: string, method: "POST" | "PUT", body: Record<string, unknown>, success: string, reload?: () => Promise<void>) => Promise<{ id?: string } | undefined>;
   refreshProductions: () => Promise<void>;
 }
 
-export function ProductionsHome({ channels, productions, rundowns, productionId, channelId, setProductionId, navigate, createProduction, mutate, refreshProductions }: Props) {
+export function ProductionsHome({ channels, productions, rundowns, setProductionId, createProduction, refreshProductions }: Props) {
+  const { productionId, channelId, navigate, mutate } = useAdminState();
   return <section className="section productions-home">
     <div className="workspace-heading"><div><h2>Productions</h2><p className="hint">Open a saved production to prepare, rehearse, or run it. Technical delivery details remain outside this starting view.</p></div><button onClick={() => createProduction(true)} disabled={!channelId}>New production</button></div>
     {productions.length === 0 ? <div className="productions-empty"><h3>You have not created a production yet.</h3><p>A production contains your programme details, viewer presentation, rundown, and live controls.</p><button onClick={() => createProduction(true)} disabled={!channelId}>Create your first production</button></div>

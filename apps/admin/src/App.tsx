@@ -1,8 +1,9 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { adminPath, parseAdminRoute, type AdminRoute } from "./routing.js";
 import { AdminHeader } from "./components/AdminHeader.js";
 import { WorkspaceNavigation } from "./components/WorkspaceNavigation.js";
 import { AdminContext } from "./components/AdminContext.js";
+import { AdminStateContext, type AdminStateValue } from "./components/AdminStateContext.js";
 import { ProductionsHome } from "./components/ProductionsHome.js";
 import { PrepareWorkspace } from "./components/PrepareWorkspace.js";
 import { RehearseWorkspace } from "./components/RehearseWorkspace.js";
@@ -105,28 +106,36 @@ export default function App() {
   const studioRundown = workspace === "prepare" && prepareTab === "rundown";
   const studioConfig = workspace === "prepare" && prepareTab === "configuration";
 
+  /* ── Shared state context ─────────────────────────────────────────────── */
+  const adminState = useMemo<AdminStateValue>(() => ({
+    channelId, productionId, rundownId, workspace,
+    navigate, mutate, send, status, setStatus, error, setError,
+  }), [channelId, productionId, rundownId, workspace, navigate, mutate, send, status, setStatus, error, setError]);
+
   /* ── Render ────────────────────────────────────────────────────────────── */
-  return <div className={`container workspace workspace--${workspace}${studioRundown ? " workspace--prepare-rundown" : ""}${studioConfig ? " workspace--prepare-config" : ""}`}>
+  return <AdminStateContext.Provider value={adminState}>
+  <div className={`container workspace workspace--${workspace}${studioRundown ? " workspace--prepare-rundown" : ""}${studioConfig ? " workspace--prepare-config" : ""}`}>
     <AdminHeader route={route} workspace={workspace} apiConnection={apiConnection} streamConnection={streamConnection} diagnosticsOpen={diagnosticsOpen} onToggleDiagnostics={() => setDiagnosticsOpen((open) => !open)} onNavigateHome={() => navigate({ workspace: "productions" })} />
     <WorkspaceNavigation route={route} productionId={productionId} productionSwitchLocked={productionSwitchLocked} onNavigate={navigate} />
     <AdminContext route={route} channels={channels} productions={productions} rundowns={rundowns} channelId={channelId} productionId={productionId} rundownId={rundownId} productionSwitchLocked={productionSwitchLocked} selectionError={selectionError} onChannelChange={setChannelId} onProductionChange={(value) => { setProductionId(value); navigate({ workspace: route.workspace === "productions" ? "prepare" : workspace, productionId: value }); }} onRundownChange={setRundownId} />
 
-    {route.workspace === "productions" && <ProductionsHome channels={channels} productions={productions} rundowns={rundowns} productionId={productionId} channelId={channelId} setProductionId={setProductionId} navigate={navigate} createProduction={createProduction} mutate={mutate} refreshProductions={refreshProductions} />}
+    {route.workspace === "productions" && <ProductionsHome channels={channels} productions={productions} rundowns={rundowns} setProductionId={setProductionId} createProduction={createProduction} refreshProductions={refreshProductions} />}
 
-    {!isProductionsHome && workspace === "prepare" && <PrepareWorkspace prepareTab={prepareTab} showConfig={showConfig} rundownEditor={rundownEditor} commandBuilder={commandBuilder} productionId={productionId} rundownId={rundownId} setRundownId={setRundownId} mutate={mutate} setStatus={setStatus} setError={setError} selectedProduction={selectedProduction} disabledCueCount={disabledCueCount} navigate={navigate} createProduction={() => createProduction()} duplicateProduction={duplicateProduction} refreshRundowns={refreshRundowns} previewProfile={previewProfile} setPreviewProfile={setPreviewProfile} layoutPreviewUrl={layoutPreviewUrl} />}
+    {!isProductionsHome && workspace === "prepare" && <PrepareWorkspace prepareTab={prepareTab} showConfig={showConfig} rundownEditor={rundownEditor} commandBuilder={commandBuilder} setRundownId={setRundownId} selectedProduction={selectedProduction} disabledCueCount={disabledCueCount} createProduction={() => createProduction()} duplicateProduction={duplicateProduction} refreshRundowns={refreshRundowns} previewProfile={previewProfile} setPreviewProfile={setPreviewProfile} layoutPreviewUrl={layoutPreviewUrl} />}
 
-    {workspace === "rehearse" && <RehearseWorkspace playerPreviewUrl={playerPreviewUrl} previewProfile={previewProfile} setPreviewProfile={setPreviewProfile} rundowns={rundowns} rundownId={rundownId} rundown={rundown} rehearsal={rehearsal} runWorkspace={runWorkspace} send={send} mutate={mutate} fetchRundown={fetchRundown} />}
+    {workspace === "rehearse" && <RehearseWorkspace playerPreviewUrl={playerPreviewUrl} previewProfile={previewProfile} setPreviewProfile={setPreviewProfile} rundowns={rundowns} rundown={rundown} rehearsal={rehearsal} runWorkspace={runWorkspace} fetchRundown={fetchRundown} />}
 
-    {workspace === "run" && <RunWorkspaceSection rundowns={rundowns} rundownId={rundownId} rundown={rundown} selectedProduction={selectedProduction} disabledCueCount={disabledCueCount} apiConnection={apiConnection} streamConnection={streamConnection} sessionId={sessionId} unresolvedOutbox={unresolvedOutbox} programmePreviewUrl={programmePreviewUrl} runWorkspace={runWorkspace} setDiagnosticsOpen={setDiagnosticsOpen} />}
+    {workspace === "run" && <RunWorkspaceSection rundowns={rundowns} rundown={rundown} selectedProduction={selectedProduction} disabledCueCount={disabledCueCount} apiConnection={apiConnection} streamConnection={streamConnection} sessionId={sessionId} unresolvedOutbox={unresolvedOutbox} programmePreviewUrl={programmePreviewUrl} runWorkspace={runWorkspace} setDiagnosticsOpen={setDiagnosticsOpen} />}
 
     <ConfirmationDialog runWorkspace={runWorkspace} />
 
-    {workspace !== "run" && <ControlSurface commandBuilder={commandBuilder} showConfig={showConfig} rehearsal={rehearsal} rundownId={rundownId} workspace={workspace} prepareTab={prepareTab} sendCommand={sendCommand} send={send} addCue={rundownEditor.addCue} />}
+    {workspace !== "run" && <ControlSurface commandBuilder={commandBuilder} showConfig={showConfig} rehearsal={rehearsal} workspace={workspace} prepareTab={prepareTab} sendCommand={sendCommand} addCue={rundownEditor.addCue} />}
 
-    {workspace === "prepare" && <LegacyOverlay title={title} setTitle={setTitle} message={message} setMessage={setMessage} duration={duration} setDuration={setDuration} send={send} />}
+    {workspace === "prepare" && <LegacyOverlay title={title} setTitle={setTitle} message={message} setMessage={setMessage} duration={duration} setDuration={setDuration} />}
 
     {status && <p className="status-msg">{status}</p>}
     {error && <p className="error-msg">{error}</p>}
     {diagnosticsOpen && <DiagnosticsPanel workspace={workspace} events={events} outbox={outbox} resolveOutbox={resolveOutbox} />}
-  </div>;
+  </div>
+  </AdminStateContext.Provider>;
 }

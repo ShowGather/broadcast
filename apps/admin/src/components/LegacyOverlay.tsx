@@ -1,3 +1,5 @@
+import { useAdminState } from "./AdminStateContext.js";
+
 interface Props {
   title: string;
   setTitle: (v: string) => void;
@@ -5,10 +7,10 @@ interface Props {
   setMessage: (v: string) => void;
   duration: number;
   setDuration: (v: number) => void;
-  send: (payload: Record<string, unknown>, statusMessage: string) => void;
 }
 
-export function LegacyOverlay({ title, setTitle, message, setMessage, duration, setDuration, send }: Props) {
+export function LegacyOverlay({ title, setTitle, message, setMessage, duration, setDuration }: Props) {
+  const { send } = useAdminState();
   return <section className="section legacy-overlay">
     <h2>Custom legacy overlay</h2>
     <div className="form">

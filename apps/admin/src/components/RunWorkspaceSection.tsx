@@ -1,9 +1,9 @@
 import type { RundownCue, OutboxItem } from "../types.js";
 import type { useRunWorkspace } from "../hooks/useRunWorkspace.js";
+import { useAdminState } from "./AdminStateContext.js";
 
 interface Props {
   rundowns: { id: string; name: string }[];
-  rundownId: string;
   rundown: RundownCue[];
   selectedProduction: { title?: string } | undefined;
   disabledCueCount: number;
@@ -16,7 +16,8 @@ interface Props {
   setDiagnosticsOpen: (open: boolean) => void;
 }
 
-export function RunWorkspaceSection({ rundowns, rundownId, rundown, selectedProduction, disabledCueCount, apiConnection, streamConnection, sessionId, unresolvedOutbox, programmePreviewUrl, runWorkspace, setDiagnosticsOpen }: Props) {
+export function RunWorkspaceSection({ rundowns, rundown, selectedProduction, disabledCueCount, apiConnection, streamConnection, sessionId, unresolvedOutbox, programmePreviewUrl, runWorkspace, setDiagnosticsOpen }: Props) {
+  const { rundownId } = useAdminState();
   return <>
     {!runWorkspace.runReady && <section className="section run-entry" aria-labelledby="run-entry-title">
       <h2 id="run-entry-title">Confirm live operation</h2>

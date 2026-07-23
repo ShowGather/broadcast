@@ -1,20 +1,19 @@
-import type { RundownCue } from "../types.js";
 import type { useShowConfiguration } from "../hooks/useShowConfiguration.js";
 import type { useCommandBuilder } from "../hooks/useCommandBuilder.js";
+import { useAdminState } from "./AdminStateContext.js";
 
 interface Props {
   commandBuilder: ReturnType<typeof useCommandBuilder>;
   showConfig: ReturnType<typeof useShowConfiguration>;
   rehearsal: boolean;
-  rundownId: string;
   workspace: string;
   prepareTab: string;
   sendCommand: () => void;
-  send: (payload: Record<string, unknown>, statusMessage: string) => void;
   addCue: () => void;
 }
 
-export function ControlSurface({ commandBuilder, showConfig, rehearsal, rundownId, workspace, prepareTab, sendCommand, send, addCue }: Props) {
+export function ControlSurface({ commandBuilder, showConfig, rehearsal, workspace, prepareTab, sendCommand, addCue }: Props) {
+  const { rundownId, send } = useAdminState();
   return <section className="section control-surface" hidden={workspace === "prepare" && prepareTab !== "rundown"}>
     <div className="workspace-heading"><div><h2>Control Surface</h2><p className="hint">Typed controls follow the selected presentation element, or can remain pinned while you work elsewhere.</p></div><div className="control-surface__mode" role="group" aria-label="Control Surface mode"><button type="button" className={!showConfig.deckPinned ? "active" : ""} onClick={() => showConfig.setDeckPinned(false)}>Follow selected cue</button><button type="button" className={showConfig.deckPinned ? "active" : ""} onClick={() => showConfig.setDeckPinned(true)}>Pinned controls</button></div></div>
     <div className="form">

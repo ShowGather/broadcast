@@ -1,21 +1,20 @@
 import type { RundownCue } from "../types.js";
 import type { useRunWorkspace } from "../hooks/useRunWorkspace.js";
+import { useAdminState } from "./AdminStateContext.js";
 
 interface Props {
   playerPreviewUrl: string;
   previewProfile: "desktop" | "mobile" | "tv";
   setPreviewProfile: (p: "desktop" | "mobile" | "tv") => void;
   rundowns: { id: string; name: string }[];
-  rundownId: string;
   rundown: RundownCue[];
   rehearsal: boolean;
   runWorkspace: ReturnType<typeof useRunWorkspace>;
-  send: (payload: Record<string, unknown>, statusMessage: string) => void;
-  mutate: (url: string, method: "POST" | "PUT", body: Record<string, unknown>, success: string, reload?: () => Promise<void>) => Promise<{ id?: string } | undefined>;
   fetchRundown: () => Promise<void>;
 }
 
-export function RehearseWorkspace({ playerPreviewUrl, previewProfile, setPreviewProfile, rundowns, rundownId, rundown, rehearsal, runWorkspace, send, mutate, fetchRundown }: Props) {
+export function RehearseWorkspace({ playerPreviewUrl, previewProfile, setPreviewProfile, rundowns, rundown, rehearsal, runWorkspace, fetchRundown }: Props) {
+  const { rundownId, send, mutate } = useAdminState();
   return <>
     <section className="section rehearsal-preview">
       <div className="workspace-heading"><div><h2>Rehearsal preview</h2><p className="hint">This embeds the real Player in rehearsal mode. It never sends rehearsal cues to the live stream.</p></div><div className="profile-picker" role="group" aria-label="Preview profile">{(["desktop", "mobile", "tv"] as const).map((profile) => <button key={profile} className={previewProfile === profile ? "active" : ""} onClick={() => setPreviewProfile(profile)}>{profile}</button>)}</div></div>
