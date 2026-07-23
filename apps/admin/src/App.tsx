@@ -103,9 +103,10 @@ export default function App() {
   const layoutPreviewUrl = channelId ? `${window.location.protocol}//${window.location.hostname}:3003/player/${encodeURIComponent(channelId)}?scene=acceptance&profile=${previewProfile}&embedded=1&productionId=${encodeURIComponent(productionId)}` : "";
   const programmePreviewUrl = channelId ? `${window.location.protocol}//${window.location.hostname}:3003/player/${encodeURIComponent(channelId)}?profile=desktop&embedded=1&productionId=${encodeURIComponent(productionId)}` : "";
   const studioRundown = workspace === "prepare" && prepareTab === "rundown";
+  const studioConfig = workspace === "prepare" && prepareTab === "configuration";
 
   /* ── Render ────────────────────────────────────────────────────────────── */
-  return <div className={`container workspace workspace--${workspace}${studioRundown ? " workspace--prepare-rundown" : ""}`}>
+  return <div className={`container workspace workspace--${workspace}${studioRundown ? " workspace--prepare-rundown" : ""}${studioConfig ? " workspace--prepare-config" : ""}`}>
     <AdminHeader route={route} workspace={workspace} apiConnection={apiConnection} streamConnection={streamConnection} diagnosticsOpen={diagnosticsOpen} onToggleDiagnostics={() => setDiagnosticsOpen((open) => !open)} onNavigateHome={() => navigate({ workspace: "productions" })} />
     <WorkspaceNavigation route={route} productionId={productionId} productionSwitchLocked={productionSwitchLocked} onNavigate={navigate} />
     <AdminContext route={route} channels={channels} productions={productions} rundowns={rundowns} channelId={channelId} productionId={productionId} rundownId={rundownId} productionSwitchLocked={productionSwitchLocked} selectionError={selectionError} onChannelChange={setChannelId} onProductionChange={(value) => { setProductionId(value); navigate({ workspace: route.workspace === "productions" ? "prepare" : workspace, productionId: value }); }} onRundownChange={setRundownId} />
