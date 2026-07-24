@@ -8,8 +8,10 @@
   "scripts": {
     "dev:api": "pnpm --filter @showgather/api dev",
     "dev:admin": "pnpm --filter @showgather/admin dev",
+    "dev:admin-next": "pnpm --filter @showgather/admin-next dev",
     "dev:player": "pnpm --filter @showgather/player dev",
-    "build": "pnpm --filter @showgather/event-schema build && pnpm --filter @showgather/id3 build && pnpm --filter @showgather/presentation-model build && pnpm --filter @showgather/api db:generate && pnpm --filter @showgather/api build && pnpm --filter @showgather/admin build && pnpm --filter @showgather/player build",
+    "dev:web": "pnpm --filter @showgather/web dev",
+    "build": "pnpm --filter @showgather/event-schema build && pnpm --filter @showgather/id3 build && pnpm --filter @showgather/presentation-model build && pnpm --filter @showgather/api db:generate && pnpm --filter @showgather/api build && pnpm --filter @showgather/admin build && pnpm --filter @showgather/admin-next build && pnpm --filter @showgather/player build && pnpm --filter @showgather/web build",
     "typecheck": "pnpm -r run typecheck",
     "stream": "bash stream/scripts/generate-test-stream.sh",
     "verify": "bash stream/scripts/verify-segments.sh",
