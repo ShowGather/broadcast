@@ -6,7 +6,7 @@ import { WorkspacePanel } from "@/components/ui/workspace-panel";
 import { CueList, CueListItem } from "@/components/ui/cue-list";
 import { StatusBadge } from "@/components/ui/status-badge";
 import { PrimaryAction, SecondaryAction, DangerAction, SafetyAction } from "@/components/ui/action-buttons";
-import { PlayerPreview } from "@/components/ui/player-preview";
+import { AdminPreview } from "@/components/ui/admin-preview";
 import { ValidationMessage } from "@/components/ui/validation-message";
 
 export function RunWorkspaceSection() {
@@ -34,24 +34,38 @@ export function RunWorkspaceSection() {
   }
 
   const left = (
-    <WorkspacePanel heading="Cue stack">
-      <CueList heading="Complete rundown" ariaLabel="Live cue stack">
-        {rundown.map((cue, index) => (
-          <CueListItem key={cue.id} order={cue.order} label={cue.label} status={cue.status} enabled={cue.enabled} active={index === runWorkspace.runCueIndex} onSelect={() => runWorkspace.setRunCueIndex(index)} disabled={!cue.enabled} />
-        ))}
-      </CueList>
+    <WorkspacePanel heading="Operational context">
+      <div style={{ display: "grid", gap: 10 }}>
+        <div style={{ padding: 10, border: "1px solid #4b2a30", borderRadius: 6, background: "#1a1114" }}>
+          <dt style={{ color: "#aeb9c9", fontSize: ".72rem", textTransform: "uppercase", letterSpacing: ".06em" }}>Production</dt>
+          <dd style={{ margin: "4px 0 0", color: "#f4f8ff", fontSize: ".86rem" }}>{selectedProduction?.title ?? "Not selected"}</dd>
+        </div>
+        <div style={{ padding: 10, border: "1px solid #4b2a30", borderRadius: 6, background: "#1a1114" }}>
+          <dt style={{ color: "#aeb9c9", fontSize: ".72rem", textTransform: "uppercase", letterSpacing: ".06em" }}>Rundown</dt>
+          <dd style={{ margin: "4px 0 0", color: "#f4f8ff", fontSize: ".86rem" }}>{rundowns.find((i) => i.id === rundownId)?.name ?? "Not selected"}</dd>
+        </div>
+        <div style={{ padding: 10, border: "1px solid #4b2a30", borderRadius: 6, background: "#1a1114" }}>
+          <dt style={{ color: "#aeb9c9", fontSize: ".72rem", textTransform: "uppercase", letterSpacing: ".06em" }}>Session</dt>
+          <dd style={{ margin: "4px 0 0", color: "#f4f8ff", fontSize: ".86rem" }}><StatusBadge status={sessionId ? "active" : "draft"} label={sessionId ? "Active" : "No session"} /></dd>
+        </div>
+        <div style={{ padding: 10, border: "1px solid #4b2a30", borderRadius: 6, background: "#1a1114" }}>
+          <dt style={{ color: "#aeb9c9", fontSize: ".72rem", textTransform: "uppercase", letterSpacing: ".06em" }}>Connection</dt>
+          <dd style={{ margin: "4px 0 0", color: "#f4f8ff", fontSize: ".86rem" }}>API {apiConnection} {"\u00B7"} Stream {streamConnection}</dd>
+        </div>
+        <div style={{ padding: 10, border: "1px solid #4b2a30", borderRadius: 6, background: "#1a1114" }}>
+          <dt style={{ color: "#aeb9c9", fontSize: ".72rem", textTransform: "uppercase", letterSpacing: ".06em" }}>Dispatch</dt>
+          <dd style={{ margin: "4px 0 0", color: "#f4f8ff", fontSize: ".86rem" }}>{unresolvedOutbox.length ? `${unresolvedOutbox.length} pending or failed` : "No issues"}</dd>
+        </div>
+      </div>
     </WorkspacePanel>
   );
 
   const centre = (
-    <WorkspacePanel heading="Programme preview" variant="run">
-      <div style={{ marginBottom: 12 }}><StatusBadge status={sessionId ? "active" : "draft"} label={sessionId ? "Session active" : "No session"} /></div>
-      <PlayerPreview url={programmePreviewUrl} title="Programme Player preview" profile="desktop" />
-    </WorkspacePanel>
+    <AdminPreview url={programmePreviewUrl} title="Live programme preview" profile="desktop" variant="run" />
   );
 
   const right = (
-    <WorkspacePanel heading="Live control" variant="run">
+    <WorkspacePanel heading="Live cue stack" variant="run">
       {unresolvedOutbox.length > 0 && <ValidationMessage type="error" message={`${unresolvedOutbox.length} pending or failed durable command${unresolvedOutbox.length === 1 ? "" : "s"} must be resolved before later live cues can be sent.`} />}
       <div style={{ marginTop: 14 }}>
         <h3 style={{ color: "#e69494", fontSize: ".72rem", fontWeight: 750, letterSpacing: ".08em", textTransform: "uppercase" }}>Current cue</h3>
@@ -71,6 +85,13 @@ export function RunWorkspaceSection() {
           {unresolvedOutbox.length > 0 ? "Resolve delivery issue" : runWorkspace.runCue?.status === "failed" ? "Retry cue" : "GO"}
         </PrimaryAction>
         <SafetyAction onClick={() => runWorkspace.setConfirmation("safe-clear")}>Safe Clear</SafetyAction>
+      </div>
+      <div style={{ marginTop: 16, borderTop: "1px solid #4c2930", paddingTop: 14, display: "flex", flexDirection: "column", gap: 8 }}>
+        <CueList heading="Complete rundown" ariaLabel="Live cue stack">
+          {rundown.map((cue, index) => (
+            <CueListItem key={cue.id} order={cue.order} label={cue.label} status={cue.status} enabled={cue.enabled} active={index === runWorkspace.runCueIndex} onSelect={() => runWorkspace.setRunCueIndex(index)} disabled={!cue.enabled} />
+          ))}
+        </CueList>
       </div>
       <div style={{ marginTop: 16, borderTop: "1px solid #4c2930", paddingTop: 14, display: "flex", flexDirection: "column", gap: 8 }}>
         <SecondaryAction onClick={() => runWorkspace.setConfirmation("complete")}>Complete show</SecondaryAction>

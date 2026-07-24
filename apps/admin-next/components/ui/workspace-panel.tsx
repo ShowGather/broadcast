@@ -9,11 +9,12 @@ interface WorkspacePanelProps {
   variant?: "default" | "readiness" | "preview" | "control" | "rehearse" | "run";
   className?: string;
   ariaLabel?: string;
+  style?: React.CSSProperties;
 }
 
-export function WorkspacePanel({ heading, hint, children, variant = "default", className = "", ariaLabel }: WorkspacePanelProps) {
+export function WorkspacePanel({ heading, hint, children, variant = "default", className = "", ariaLabel, style }: WorkspacePanelProps) {
   return (
-    <section className={`workspace-panel workspace-panel--${variant} ${className}`} aria-label={ariaLabel}>
+    <section className={`workspace-panel workspace-panel--${variant} ${className}`} aria-label={ariaLabel} style={style}>
       {(heading || hint) && (
         <div className="workspace-panel__header">
           {heading && <h2 className="workspace-panel__heading">{heading}</h2>}

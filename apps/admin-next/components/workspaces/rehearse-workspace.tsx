@@ -7,7 +7,7 @@ import { WorkspacePanel } from "@/components/ui/workspace-panel";
 import { CueList, CueListItem } from "@/components/ui/cue-list";
 import { ProfileSelector } from "@/components/ui/profile-selector";
 import { PrimaryAction, SecondaryAction, SafetyAction } from "@/components/ui/action-buttons";
-import { PlayerPreview } from "@/components/ui/player-preview";
+import { AdminPreview } from "@/components/ui/admin-preview";
 
 export function RehearseWorkspace() {
   const { rundownId, productionId, mutate, navigate, rundown, workspace, runWorkspace, fetchRundown, previewProfile, setPreviewProfile, playerPreviewUrl } = useAdminState();
@@ -20,48 +20,43 @@ export function RehearseWorkspace() {
   const nextCue = currentIndex >= 0 ? rundown[currentIndex + 1] : null;
 
   const left = (
-    <WorkspacePanel heading="Rehearsal rundown">
+    <WorkspacePanel heading="Rehearsal controls">
       <ProfileSelector profiles={["desktop", "mobile", "tv"]} selected={previewProfile} onSelect={(p) => setPreviewProfile(p as "desktop" | "mobile" | "tv")} label="Preview profile" />
       <div style={{ marginTop: 14 }}>
         <PrimaryAction disabled={!rundownId} onClick={() => mutate(`/api/rundown/${rehearsal ? "rehearsal" : "live"}/sessions?rundownId=${encodeURIComponent(rundownId)}`, "POST", {}, `${rehearsal ? "Rehearsal" : "Live"} session started`, fetchRundown)}>
           {rehearsal ? "Reset rehearsal session" : "Start new live session"}
         </PrimaryAction>
       </div>
-      <div style={{ marginTop: 14 }}>
-        <CueList heading="Cue list" ariaLabel="Rehearsal cues">
-          {rundown.map((cue, index) => (
-            <CueListItem key={cue.id} order={cue.order} label={cue.label} status={cue.status} enabled={cue.enabled} active={selectedCueIndex === index} onSelect={() => setSelectedCueIndex(index)}
-              actions={<button disabled={cue.status === "active" || cue.status === "cancelled"} onClick={(e) => { e.stopPropagation(); runWorkspace.goCue(cue); }}>{cue.status === "failed" ? "Retry" : "GO"}</button>} />
-          ))}
-        </CueList>
-      </div>
+      {selectedCue ? (
+        <WorkspacePanel heading="Selected cue" variant="rehearse" style={{ marginTop: 14 }}>
+          <p style={{ color: "#e6cea0", fontSize: ".86rem" }}>{selectedCue.order}. {selectedCue.label}</p>
+          <p style={{ color: "#aebbd0", fontSize: ".78rem", marginTop: 2 }}>Status: {selectedCue.status}</p>
+          <PrimaryAction disabled={selectedCue.status === "active" || selectedCue.status === "cancelled"} onClick={() => runWorkspace.goCue(selectedCue)} style={{ marginTop: 12 }}>GO IN REHEARSAL</PrimaryAction>
+          {selectedCue.status === "complete" && <SecondaryAction onClick={() => runWorkspace.goCue(selectedCue, true)} style={{ marginTop: 8 }}>Re-run in rehearsal</SecondaryAction>}
+        </WorkspacePanel>
+      ) : currentCue ? (
+        <WorkspacePanel heading="Current cue" variant="rehearse" style={{ marginTop: 14 }}>
+          <p style={{ color: "#e6cea0", fontSize: ".86rem" }}>{currentCue.order}. {currentCue.label}</p>
+          {nextCue && <div style={{ marginTop: 8 }}><span style={{ color: "#ffe2a2", fontSize: ".72rem", fontWeight: 750, letterSpacing: ".08em", textTransform: "uppercase" }}>Next</span><p style={{ color: "#e6cea0", fontSize: ".86rem", marginTop: 2 }}>{nextCue.order}. {nextCue.label}</p></div>}
+        </WorkspacePanel>
+      ) : (
+        <p className="hint" style={{ marginTop: 14 }}>Select a cue from the list to view its details.</p>
+      )}
     </WorkspacePanel>
   );
 
   const centre = (
-    <WorkspacePanel heading="Rehearsal preview" variant="rehearse">
-      <p className="hint" style={{ marginBottom: 12 }}>This embeds the real Player in rehearsal mode. It never sends rehearsal cues to the live stream.</p>
-      <PlayerPreview url={playerPreviewUrl} title={`Rehearsal Player ${previewProfile} preview`} profile={previewProfile} />
-    </WorkspacePanel>
+    <AdminPreview url={playerPreviewUrl} title={`Rehearsal ${previewProfile} preview`} profile={previewProfile} variant="rehearse" />
   );
 
   const right = (
-    <WorkspacePanel heading="Cue control" variant="rehearse">
-      {selectedCue ? (<>
-        <div style={{ marginBottom: 14 }}>
-          <h3 style={{ color: "#ffe2a2", fontSize: ".78rem", fontWeight: 750, letterSpacing: ".07em", textTransform: "uppercase" }}>Selected cue</h3>
-          <p style={{ color: "#e6cea0", fontSize: ".86rem", marginTop: 4 }}>{selectedCue.order}. {selectedCue.label}</p>
-          <p style={{ color: "#aebbd0", fontSize: ".78rem", marginTop: 2 }}>Status: {selectedCue.status}</p>
-        </div>
-        <PrimaryAction disabled={selectedCue.status === "active" || selectedCue.status === "cancelled"} onClick={() => runWorkspace.goCue(selectedCue)}>GO IN REHEARSAL</PrimaryAction>
-        {selectedCue.status === "complete" && <SecondaryAction onClick={() => runWorkspace.goCue(selectedCue, true)} style={{ marginTop: 8 }}>Re-run in rehearsal</SecondaryAction>}
-      </>) : currentCue ? (
-        <div style={{ marginBottom: 14 }}>
-          <h3 style={{ color: "#ffe2a2", fontSize: ".78rem", fontWeight: 750, letterSpacing: ".07em", textTransform: "uppercase" }}>Current cue</h3>
-          <p style={{ color: "#e6cea0", fontSize: ".86rem", marginTop: 4 }}>{currentCue.order}. {currentCue.label}</p>
-          {nextCue && <div style={{ marginTop: 8 }}><span style={{ color: "#ffe2a2", fontSize: ".72rem", fontWeight: 750, letterSpacing: ".08em", textTransform: "uppercase" }}>Next</span><p style={{ color: "#e6cea0", fontSize: ".86rem", marginTop: 2 }}>{nextCue.order}. {nextCue.label}</p></div>}
-        </div>
-      ) : (<p className="hint">Select a cue from the list to view its details and controls.</p>)}
+    <WorkspacePanel heading="Rehearsal cue stack">
+      <CueList heading="Cues" ariaLabel="Rehearsal cues">
+        {rundown.map((cue, index) => (
+          <CueListItem key={cue.id} order={cue.order} label={cue.label} status={cue.status} enabled={cue.enabled} active={selectedCueIndex === index} onSelect={() => setSelectedCueIndex(index)}
+            actions={<button disabled={cue.status === "active" || cue.status === "cancelled"} onClick={(e) => { e.stopPropagation(); runWorkspace.goCue(cue); }}>{cue.status === "failed" ? "Retry" : "GO"}</button>} />
+        ))}
+      </CueList>
       <div style={{ marginTop: 16, display: "flex", flexDirection: "column", gap: 8 }}>
         <SecondaryAction onClick={() => navigate(`/admin/productions/${encodeURIComponent(productionId)}/prepare`)}>Return to Prepare</SecondaryAction>
         <PrimaryAction onClick={() => navigate(`/admin/productions/${encodeURIComponent(productionId)}/run`)}>Proceed to Run</PrimaryAction>

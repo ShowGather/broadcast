@@ -5,7 +5,7 @@ import { ThreeColumnWorkspace } from "@/components/ui/three-column-workspace";
 import { WorkspacePanel } from "@/components/ui/workspace-panel";
 import { PrimaryAction, SecondaryAction, DangerAction } from "@/components/ui/action-buttons";
 import { ProfileSelector } from "@/components/ui/profile-selector";
-import { PlayerPreview } from "@/components/ui/player-preview";
+import { AdminPreview } from "@/components/ui/admin-preview";
 
 export function ViewerWorkspace() {
   const { setStatus, setError, showConfig, previewProfile, setPreviewProfile, layoutPreviewUrl } = useAdminState();
@@ -67,67 +67,75 @@ export function ViewerWorkspace() {
   );
 
   const centre = (
-    <WorkspacePanel heading="Placement editor">
-      <div className="form">
-        <label><span>Instance</span>
-          <select value={showConfig.layoutInstanceId} onChange={(e) => showConfig.setLayoutInstanceId(e.target.value)}>
-            <option value="scorebug">Main scorebug</option><option value="lower-third">Lower third</option><option value="primary">Sponsor panel</option><option value="ticker">Ticker</option>
-            {showConfig.presentationInstances.map((i) => (<option key={i.id} value={i.id}>{i.label}{i.enabled ? "" : " (disabled)"}</option>))}
-          </select>
-        </label>
-        <label><span>Profile</span>
-          <select value={showConfig.layoutProfile} onChange={(e) => showConfig.setLayoutProfile(e.target.value as "desktop" | "tv" | "mobile")}>
-            {(["desktop", "tv", "mobile"] as const).map((p) => (<option key={p}>{p}</option>))}
-          </select>
-        </label>
-        <label><span>Surface</span>
-          <select value={showConfig.layoutSurface} onChange={(e) => showConfig.setLayoutSurface(e.target.value as "video" | "surround" | "companion")}>
-            {(["video", "surround", "companion"] as const).map((s) => (<option key={s}>{s}</option>))}
-          </select>
-        </label>
-        <label><span>Preset</span>
-          <select value={showConfig.layoutAnchor} onChange={(e) => showConfig.setLayoutAnchor(e.target.value as "top-left" | "top-centre" | "top-right" | "centre-left" | "centre" | "centre-right" | "bottom-left" | "bottom-centre" | "bottom-right")}>
-            {(["top-left", "top-centre", "top-right", "centre-left", "centre", "centre-right", "bottom-left", "bottom-centre", "bottom-right"] as const).map((a) => (<option key={a}>{a}</option>))}
-          </select>
-        </label>
-        <label><span>Profile variant</span>
-          <select value={showConfig.layoutVariant} onChange={(e) => showConfig.setLayoutVariant(e.target.value)}>
-            <option value="standard">Standard</option><option value="wide">Wide</option><option value="broadcast">Broadcast</option><option value="compact">Compact</option><option value="headline">Headline</option>
-          </select>
-        </label>
-        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
-          <label><span>Horizontal offset</span><input type="number" min={0} max={1} step={.01} value={showConfig.layoutX} onChange={(e) => showConfig.setLayoutX(Number(e.target.value))} /></label>
-          <label><span>Vertical offset</span><input type="number" min={0} max={1} step={.01} value={showConfig.layoutY} onChange={(e) => showConfig.setLayoutY(Number(e.target.value))} /></label>
-          <label><span>Width</span><input type="number" min={.08} max={1} step={.01} value={showConfig.layoutWidth} onChange={(e) => showConfig.setLayoutWidth(Number(e.target.value))} /></label>
-          <label><span>Height (optional)</span><input type="number" min={0} max={1} step={.01} value={showConfig.layoutHeight} onChange={(e) => showConfig.setLayoutHeight(e.target.value === "" ? "" : Number(e.target.value))} /></label>
-          <label><span>Opacity</span><input type="number" min={0} max={1} step={.05} value={showConfig.layoutOpacity} onChange={(e) => showConfig.setLayoutOpacity(Number(e.target.value))} /></label>
-          <label><span>Rotation</span><input type="number" min={-180} max={180} step={1} value={showConfig.layoutRotation} onChange={(e) => showConfig.setLayoutRotation(Number(e.target.value))} /></label>
-        </div>
-        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr 1fr", gap: 8 }}>
-          <label><span>Crop top</span><input type="number" min={0} max={1} step={.01} value={showConfig.layoutCropTop} onChange={(e) => showConfig.setLayoutCropTop(Number(e.target.value))} /></label>
-          <label><span>Crop right</span><input type="number" min={0} max={1} step={.01} value={showConfig.layoutCropRight} onChange={(e) => showConfig.setLayoutCropRight(Number(e.target.value))} /></label>
-          <label><span>Crop bottom</span><input type="number" min={0} max={1} step={.01} value={showConfig.layoutCropBottom} onChange={(e) => showConfig.setLayoutCropBottom(Number(e.target.value))} /></label>
-          <label><span>Crop left</span><input type="number" min={0} max={1} step={.01} value={showConfig.layoutCropLeft} onChange={(e) => showConfig.setLayoutCropLeft(Number(e.target.value))} /></label>
-        </div>
-        <label><span>Collision policy</span>
-          <select value={showConfig.layoutPolicy} onChange={(e) => showConfig.setLayoutPolicy(e.target.value as "single" | "row" | "column" | "overlay")}>
-            <option value="overlay">Overlay</option><option value="row">Stack in row</option><option value="column">Stack in column</option><option value="single">Single slot</option>
-          </select>
-        </label>
-        <label><span>Title/action safe area</span><input type="checkbox" checked={showConfig.layoutSafeArea} onChange={(e) => showConfig.setLayoutSafeArea(e.target.checked)} /></label>
-        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
-          <label><span>Layer order</span><input type="number" min={0} max={999} step={1} value={showConfig.layoutZIndex} onChange={(e) => showConfig.setLayoutZIndex(Number(e.target.value))} /></label>
-          <label><span>Transition</span>
-            <select value={showConfig.transitionKind} onChange={(e) => showConfig.setTransitionKind(e.target.value as "cut" | "fade" | "slide" | "scale")}>
-              <option value="cut">Cut</option><option value="fade">Fade</option><option value="slide">Slide</option><option value="scale">Scale</option>
+    <>
+      <AdminPreview url={layoutPreviewUrl} title={`Viewer ${previewProfile} preview`} profile={previewProfile} showGuides />
+      <WorkspacePanel heading="Placement editor" variant="control" style={{ marginTop: 8, flex: "0 0 auto", maxHeight: "45%", overflow: "auto" }}>
+        <div className="form">
+          <label><span>Instance</span>
+            <select value={showConfig.layoutInstanceId} onChange={(e) => showConfig.setLayoutInstanceId(e.target.value)}>
+              <option value="scorebug">Main scorebug</option><option value="lower-third">Lower third</option><option value="primary">Sponsor panel</option><option value="ticker">Ticker</option>
+              {showConfig.presentationInstances.map((i) => (<option key={i.id} value={i.id}>{i.label}{i.enabled ? "" : " (disabled)"}</option>))}
             </select>
           </label>
-          <label><span>Transition duration (ms)</span><input type="number" min={0} max={5000} step={10} value={showConfig.transitionDuration} onChange={(e) => showConfig.setTransitionDuration(Number(e.target.value))} /></label>
+          <label><span>Profile</span>
+            <select value={showConfig.layoutProfile} onChange={(e) => showConfig.setLayoutProfile(e.target.value as "desktop" | "tv" | "mobile")}>
+              {(["desktop", "tv", "mobile"] as const).map((p) => (<option key={p}>{p}</option>))}
+            </select>
+          </label>
+          <label><span>Surface</span>
+            <select value={showConfig.layoutSurface} onChange={(e) => showConfig.setLayoutSurface(e.target.value as "video" | "surround" | "companion")}>
+              {(["video", "surround", "companion"] as const).map((s) => (<option key={s}>{s}</option>))}
+            </select>
+          </label>
+          <label><span>Preset</span>
+            <select value={showConfig.layoutAnchor} onChange={(e) => showConfig.setLayoutAnchor(e.target.value as "top-left" | "top-centre" | "top-right" | "centre-left" | "centre" | "centre-right" | "bottom-left" | "bottom-centre" | "bottom-right")}>
+              {(["top-left", "top-centre", "top-right", "centre-left", "centre", "centre-right", "bottom-left", "bottom-centre", "bottom-right"] as const).map((a) => (<option key={a}>{a}</option>))}
+            </select>
+          </label>
+          <label><span>Profile variant</span>
+            <select value={showConfig.layoutVariant} onChange={(e) => showConfig.setLayoutVariant(e.target.value)}>
+              <option value="standard">Standard</option><option value="wide">Wide</option><option value="broadcast">Broadcast</option><option value="compact">Compact</option><option value="headline">Headline</option>
+            </select>
+          </label>
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
+            <label><span>Horizontal offset</span><input type="number" min={0} max={1} step={.01} value={showConfig.layoutX} onChange={(e) => showConfig.setLayoutX(Number(e.target.value))} /></label>
+            <label><span>Vertical offset</span><input type="number" min={0} max={1} step={.01} value={showConfig.layoutY} onChange={(e) => showConfig.setLayoutY(Number(e.target.value))} /></label>
+            <label><span>Width</span><input type="number" min={.08} max={1} step={.01} value={showConfig.layoutWidth} onChange={(e) => showConfig.setLayoutWidth(Number(e.target.value))} /></label>
+            <label><span>Height (optional)</span><input type="number" min={0} max={1} step={.01} value={showConfig.layoutHeight} onChange={(e) => showConfig.setLayoutHeight(e.target.value === "" ? "" : Number(e.target.value))} /></label>
+            <label><span>Opacity</span><input type="number" min={0} max={1} step={.05} value={showConfig.layoutOpacity} onChange={(e) => showConfig.setLayoutOpacity(Number(e.target.value))} /></label>
+            <label><span>Rotation</span><input type="number" min={-180} max={180} step={1} value={showConfig.layoutRotation} onChange={(e) => showConfig.setLayoutRotation(Number(e.target.value))} /></label>
+          </div>
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr 1fr", gap: 8 }}>
+            <label><span>Crop top</span><input type="number" min={0} max={1} step={.01} value={showConfig.layoutCropTop} onChange={(e) => showConfig.setLayoutCropTop(Number(e.target.value))} /></label>
+            <label><span>Crop right</span><input type="number" min={0} max={1} step={.01} value={showConfig.layoutCropRight} onChange={(e) => showConfig.setLayoutCropRight(Number(e.target.value))} /></label>
+            <label><span>Crop bottom</span><input type="number" min={0} max={1} step={.01} value={showConfig.layoutCropBottom} onChange={(e) => showConfig.setLayoutCropBottom(Number(e.target.value))} /></label>
+            <label><span>Crop left</span><input type="number" min={0} max={1} step={.01} value={showConfig.layoutCropLeft} onChange={(e) => showConfig.setLayoutCropLeft(Number(e.target.value))} /></label>
+          </div>
+          <label><span>Collision policy</span>
+            <select value={showConfig.layoutPolicy} onChange={(e) => showConfig.setLayoutPolicy(e.target.value as "single" | "row" | "column" | "overlay")}>
+              <option value="overlay">Overlay</option><option value="row">Stack in row</option><option value="column">Stack in column</option><option value="single">Single slot</option>
+            </select>
+          </label>
+          <label><span>Title/action safe area</span><input type="checkbox" checked={showConfig.layoutSafeArea} onChange={(e) => showConfig.setLayoutSafeArea(e.target.checked)} /></label>
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
+            <label><span>Layer order</span><input type="number" min={0} max={999} step={1} value={showConfig.layoutZIndex} onChange={(e) => showConfig.setLayoutZIndex(Number(e.target.value))} /></label>
+            <label><span>Transition</span>
+              <select value={showConfig.transitionKind} onChange={(e) => showConfig.setTransitionKind(e.target.value as "cut" | "fade" | "slide" | "scale")}>
+                <option value="cut">Cut</option><option value="fade">Fade</option><option value="slide">Slide</option><option value="scale">Scale</option>
+              </select>
+            </label>
+            <label><span>Transition duration (ms)</span><input type="number" min={0} max={5000} step={10} value={showConfig.transitionDuration} onChange={(e) => showConfig.setTransitionDuration(Number(e.target.value))} /></label>
+          </div>
+          <PrimaryAction onClick={showConfig.saveLayoutPreset}>Apply preset</PrimaryAction>
         </div>
-        <PrimaryAction onClick={showConfig.saveLayoutPreset}>Apply preset</PrimaryAction>
-      </div>
-      {showConfig.presentationLayouts.length > 0 && (
-        <ul className="placement-summary" style={{ marginTop: 14 }}>
+      </WorkspacePanel>
+    </>
+  );
+
+  const right = (
+    <WorkspacePanel heading="Instance summary" variant="readiness">
+      {showConfig.presentationLayouts.length > 0 ? (
+        <ul className="placement-summary">
           {showConfig.presentationLayouts.map((def) => (
             <li key={def.instanceId}>
               <span><b>{def.instanceId}</b> {"\u00B7"} {Object.entries(def.placementByProfile).map(([profile, placement]) => `${profile}: ${placement?.surface} ${placement?.anchor}`).join(" \u00B7 ")}</span>
@@ -137,13 +145,9 @@ export function ViewerWorkspace() {
             </li>
           ))}
         </ul>
+      ) : (
+        <p className="hint">No layouts configured yet. Add instances and apply presets to define placements.</p>
       )}
-    </WorkspacePanel>
-  );
-
-  const right = (
-    <WorkspacePanel heading="Player preview" variant="preview">
-      <PlayerPreview url={layoutPreviewUrl} title={`Placement Player ${previewProfile} preview`} profile={previewProfile} />
     </WorkspacePanel>
   );
 
