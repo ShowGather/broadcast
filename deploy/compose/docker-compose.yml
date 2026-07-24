@@ -72,11 +72,11 @@ services:
   admin:
     build:
       context: ../..
-      dockerfile: deploy/compose/Dockerfile.admin
+      dockerfile: deploy/compose/Dockerfile.admin-next
     ports:
       - "3002:3002"
     environment:
-      API_URL: http://api:3001
+      API_INTERNAL_URL: http://api:3001
     depends_on:
       api:
         condition: service_healthy

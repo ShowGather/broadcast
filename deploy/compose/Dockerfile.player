@@ -8,6 +8,8 @@ COPY package.json pnpm-lock.yaml pnpm-workspace.yaml tsconfig.json ./
 COPY packages/event-schema/package.json ./packages/event-schema/
 COPY packages/id3/package.json ./packages/id3/
 COPY packages/presentation-model/package.json ./packages/presentation-model/
+COPY packages/player-core/package.json ./packages/player-core/
+COPY packages/player-ui/package.json ./packages/player-ui/
 COPY services/api/package.json ./services/api/
 COPY apps/admin/package.json ./apps/admin/
 COPY apps/player/package.json ./apps/player/
@@ -17,11 +19,15 @@ RUN pnpm install --frozen-lockfile
 COPY packages/event-schema/ ./packages/event-schema/
 COPY packages/id3/ ./packages/id3/
 COPY packages/presentation-model/ ./packages/presentation-model/
+COPY packages/player-core/ ./packages/player-core/
+COPY packages/player-ui/ ./packages/player-ui/
 COPY apps/player/ ./apps/player/
 
 RUN pnpm --filter @showgather/event-schema build
 RUN pnpm --filter @showgather/id3 build
 RUN pnpm --filter @showgather/presentation-model build
+RUN pnpm --filter @showgather/player-core build
+RUN pnpm --filter @showgather/player-ui build
 
 EXPOSE 3003
 CMD ["sh", "-c", "cd apps/player && npx vite --host 0.0.0.0 --port 3003"]
