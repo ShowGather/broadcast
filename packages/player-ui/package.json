@@ -13,9 +13,11 @@
   "scripts": {
     "typecheck": "tsc --noEmit"
   },
-  "dependencies": {
+  "peerDependencies": {
     "react": "^18.3.1",
-    "react-dom": "^18.3.1",
+    "react-dom": "^18.3.1"
+  },
+  "dependencies": {
     "@showgather/presentation-model": "workspace:*",
     "@showgather/player-core": "workspace:*"
   },

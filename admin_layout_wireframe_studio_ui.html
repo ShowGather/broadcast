@@ -1,0 +1,164 @@
+<!DOCTYPE html>
+<html lang="en" class="h-full w-full">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Admin Area Wireframe</title>
+  
+  <!-- Tailwind CSS CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  
+  <!-- Google Fonts: Inter -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
+
+  <style>
+    body {
+      font-family: 'Inter', sans-serif;
+      user-select: none;
+      -webkit-user-select: none;
+      background-color: #f3f4f6;
+    }
+
+    /* Pure Wireframe Styling */
+    .wf-box {
+      background-color: #e5e7eb;
+      border: 2px solid #000000;
+      color: #000000;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 1.125rem;
+      font-weight: 700;
+      text-align: center;
+      position: relative;
+    }
+
+    .wf-subbox {
+      background-color: #ffffff;
+      border: 1.5px solid #000000;
+      color: #000000;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 0.875rem;
+      font-weight: 600;
+    }
+
+    /* Container Query Math for Strict 16:9 Aspect Ratio Fitting */
+    .video-container {
+      container-type: size;
+    }
+
+    .video-16-9 {
+      aspect-ratio: 16 / 9;
+      width: min(100cqw, calc(100cqh * 16 / 9));
+      height: min(100cqh, calc(100cqw * 9 / 16));
+    }
+  </style>
+</head>
+<body class="h-screen w-screen overflow-hidden flex flex-col p-2 bg-slate-200 gap-1.5 antialiased">
+
+  <!-- ==================== TOP BAR ==================== -->
+  <header class="h-12 w-full flex flex-row gap-1.5 shrink-0">
+    <!-- App Name (Far Left) -->
+    <div class="wf-box w-56 shrink-0">
+      App Name
+    </div>
+
+    <!-- Menu Tabs (Center) -->
+    <div class="wf-box flex-1">
+      Menu Tabs
+    </div>
+
+    <!-- User (Far Right) -->
+    <div class="wf-box w-64 shrink-0">
+      User
+    </div>
+  </header>
+
+  <!-- ==================== MAIN WORKSPACE AREA ==================== -->
+  <main class="flex-1 flex flex-row gap-1.5 overflow-hidden">
+
+    <!-- ==================== FAR LEFT COLUMN (Elements) ==================== -->
+    <aside class="w-56 flex flex-col shrink-0">
+      <!-- Elements extends all the way down to the status bar -->
+      <div class="wf-box h-full w-full">
+        Elements
+      </div>
+    </aside>
+
+    <!-- ==================== CENTER WORKSPACE AREA ==================== -->
+    <section class="flex-1 flex flex-col gap-1.5 overflow-hidden">
+      
+      <!-- TOP CENTRAL REGION (Left Skyscraper, Video Stage, Right Skyscraper) -->
+      <div class="flex-1 flex flex-row gap-1.5 overflow-hidden min-h-0">
+
+        <!-- LEFT SKYSCRAPER -->
+        <div class="wf-box w-20 md:w-24 shrink-0">
+          <span class="-rotate-90 md:rotate-0 inline-block">Left Skyscraper</span>
+        </div>
+
+        <!-- CENTER STAGE (Header, Video 16:9, Footer) -->
+        <div class="flex-1 flex flex-col gap-1.5 overflow-hidden">
+          
+          <!-- Header Bar (Expanded to fill remaining top space) -->
+          <div class="wf-box flex-1 min-h-[2.75rem] px-3 flex flex-row items-center justify-between relative">
+            <span class="mx-auto">Header</span>
+            
+            <!-- WEB / TV / MOBILE TOGGLE -->
+            <div class="wf-subbox px-3 py-1 text-xs shrink-0 absolute right-2 top-2">
+              Web / TV / Mobile Toggle
+            </div>
+          </div>
+
+          <!-- VIDEO VIEWPORT AREA (Strict 16:9 Ratio Bounding Box) -->
+          <div class="wf-box w-full aspect-video shrink-0 flex flex-col items-center justify-center">
+            <span>Video</span>
+            <span class="text-xs font-normal text-gray-700 mt-1">(16:9 Aspect Ratio)</span>
+          </div>
+
+          <!-- FOOTER BAR (Expanded to fill remaining bottom space) -->
+          <div class="wf-box flex-1 min-h-[2.75rem] flex items-center justify-center">
+            Footer
+          </div>
+
+        </div>
+
+        <!-- RIGHT SKYSCRAPER -->
+        <div class="wf-box w-20 md:w-24 shrink-0">
+          <span class="-rotate-90 md:rotate-0 inline-block">Right Skyscraper</span>
+        </div>
+
+      </div>
+
+      <!-- DYNAMIC CONTROLS (Spans full width under left skyscraper, video, and right skyscraper) -->
+      <div class="wf-box h-48 md:h-56 shrink-0">
+        Dynamic Controls
+      </div>
+
+    </section>
+
+    <!-- ==================== FAR RIGHT COLUMN (Cue Stack & GO Button) ==================== -->
+    <aside class="w-64 flex flex-col gap-1.5 shrink-0">
+      <!-- Cue Stack (Top Area) -->
+      <div class="wf-box flex-1">
+        Cue Stack
+      </div>
+
+      <!-- GO Button (Bottom Area) -->
+      <div class="wf-box h-20 shrink-0 bg-gray-300">
+        GO
+      </div>
+    </aside>
+
+  </main>
+
+  <!-- ==================== STATUS BAR (Full Width Bottom) ==================== -->
+  <footer class="wf-box h-10 w-full shrink-0">
+    Status Bar
+  </footer>
+
+</body>
+</html>
