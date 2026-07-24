@@ -15,7 +15,9 @@
     "hls.js": "^1.5.17",
     "@showgather/event-schema": "workspace:*",
     "@showgather/id3": "workspace:*",
-    "@showgather/presentation-model": "workspace:*"
+    "@showgather/presentation-model": "workspace:*",
+    "@showgather/player-core": "workspace:*",
+    "@showgather/player-ui": "workspace:*"
   },
   "devDependencies": {
     "vite": "^5.4.11",

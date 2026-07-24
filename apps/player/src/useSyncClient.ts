@@ -7,7 +7,7 @@ import {
   seekMediaTimeline,
   type ActiveEvent,
   type ScheduledEvent,
-} from "./sync/mediaTimeline";
+} from "@showgather/player-core";
 
 export interface SyncLogEntry {
   eventId: string;

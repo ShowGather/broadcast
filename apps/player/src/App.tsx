@@ -1,14 +1,10 @@
 import { useCallback, useEffect, useRef, useState, type CSSProperties } from "react";
 import type { ShowGatherEvent } from "@showgather/event-schema";
 import { createV13PresentationAcceptanceScene, type PresentationLayoutDefinition, type PresentationSnapshot } from "@showgather/presentation-model";
+import { createDemoPresentationState, resolveTimedPresentationEvent, PersistentRevisionGate } from "@showgather/player-core";
+import { PresentationProvider, PresentationRegion, usePresentation, ViewerShell, type ViewerProfile } from "@showgather/player-ui";
+import type { CompanionPanel, CompanionPanelLabels } from "@showgather/player-ui";
 import { useSyncClient } from "./useSyncClient";
-import { PresentationProvider, usePresentation } from "./presentation/PresentationProvider";
-import { PresentationRegion } from "./presentation/PresentationRegion";
-import { createDemoPresentationState } from "./presentation/demoState";
-import { resolveTimedPresentationEvent } from "./presentation/cues";
-import { PersistentRevisionGate } from "./presentation/persistentRevision";
-import { ViewerShell, type ViewerProfile } from "./viewer/ViewerShell";
-import type { CompanionPanel, CompanionPanelLabels } from "./viewer/InteractivePanels";
 
 function deltaClass(delta: number | null): string {
   if (delta === null) return "pending";
