@@ -117,7 +117,7 @@ return <AdminStateContext.Provider value={adminState}>
       {route.workspace === "productions" && <ProductionsHome channels={channels} productions={productions} rundowns={rundowns} setProductionId={setProductionId} createProduction={createProduction} refreshProductions={refreshProductions} />}
 
       {!isProductionsHome && workspace === "prepare" && prepareTab === "overview" && (
-        <PrepareOverview showConfig={showConfig} rundownEditor={rundownEditor} selectedProduction={selectedProduction} disabledCueCount={disabledCueCount} createProduction={() => createProduction()} duplicateProduction={duplicateProduction} onNavigate={navigatePrepareTab} />
+        <PrepareOverview showConfig={showConfig} rundownEditor={rundownEditor} selectedProduction={selectedProduction} disabledCueCount={disabledCueCount> createProduction={() => createProduction()} duplicateProduction={duplicateProduction} onNavigate={navigatePrepareTab} />
       )}
 
       {!isProductionsHome && workspace === "prepare" && prepareTab === "rundown" && (

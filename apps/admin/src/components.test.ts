@@ -14,12 +14,15 @@ test("all workspace components export named functions", async () => {
     "./components/AdminContext.js",
     "./components/WorkspaceNavigation.js",
     "./components/ProductionsHome.js",
-    "./components/PrepareWorkspace.js",
+    "./components/PrepareOverview.js",
+    "./components/RundownWorkspace.js",
+    "./components/ViewerWorkspace.js",
+    "./components/ShowConfigurationWorkspace.js",
     "./components/RehearseWorkspace.js",
     "./components/RunWorkspaceSection.js",
-    "./components/ControlSurface.js",
     "./components/DiagnosticsPanel.js",
     "./components/LegacyOverlay.js",
+    "./components/layout/AdminShell.js",
   ];
   for (const path of components) {
     const mod = await import(path);
