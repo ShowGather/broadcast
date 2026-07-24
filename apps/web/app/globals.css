@@ -1,0 +1,27 @@
+@import "tailwindcss";
+
+@layer base {
+  :root {
+    --sg-page-bg: #cbd5e1;
+    --sg-panel-bg: #e2e8f0;
+    --sg-surface: #ffffff;
+    --sg-border: #0f172a;
+    --sg-muted: #475569;
+    --sg-live: #dc2626;
+    --sg-rehearsal: #d97706;
+    --sg-healthy: #15803d;
+    --sg-selected: #bae6fd;
+    --viewer-accent: #73e3ff;
+  }
+}
+
+body {
+  margin: 0;
+  background: #080b12;
+  color: #e7edf7;
+  font-family: Inter, ui-sans-serif, system-ui, sans-serif;
+}
+
+button {
+  font: inherit;
+}

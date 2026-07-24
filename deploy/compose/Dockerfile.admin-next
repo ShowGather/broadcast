@@ -1,0 +1,32 @@
+FROM node:22-slim
+RUN npm install -g pnpm
+WORKDIR /app
+
+COPY package.json pnpm-lock.yaml pnpm-workspace.yaml tsconfig.json ./
+COPY packages/event-schema/package.json ./packages/event-schema/
+COPY packages/id3/package.json ./packages/id3/
+COPY packages/presentation-model/package.json ./packages/presentation-model/
+COPY packages/player-core/package.json ./packages/player-core/
+COPY packages/player-ui/package.json ./packages/player-ui/
+COPY services/api/package.json ./services/api/
+COPY apps/admin/package.json ./apps/admin/
+COPY apps/player/package.json ./apps/player/
+COPY apps/web/package.json ./apps/web/
+COPY apps/admin-next/package.json ./apps/admin-next/
+
+RUN pnpm install --frozen-lockfile
+
+COPY packages/event-schema/ ./packages/event-schema/
+COPY packages/id3/ ./packages/id3/
+COPY packages/presentation-model/ ./packages/presentation-model/
+COPY packages/player-core/ ./packages/player-core/
+COPY packages/player-ui/ ./packages/player-ui/
+COPY apps/admin-next/ ./apps/admin-next/
+
+ENV API_INTERNAL_URL=http://api:3001
+
+RUN pnpm --filter @showgather/admin-next build
+
+ENV PORT=3002
+EXPOSE 3002
+CMD ["sh", "-c", "cd apps/admin-next && npx next start -p 3002"]
