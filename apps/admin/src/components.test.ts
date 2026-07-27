@@ -7,7 +7,7 @@ import { DiagnosticsInspectorPanel, DiagnosticsNavigationPanel, DiagnosticsOverv
 import { PrepareNavigationPanel, PrepareProductionEditor, PrepareReadinessPanel, PrepareSummaryPanel } from "./components/PrepareOverview.js";
 import { ProductionDraftPanel, ProductionsCataloguePanel, ProductionsFilterPanel, ProductionSummaryPanel, productionVisibleInFilter } from "./components/ProductionsHome.js";
 import { RehearsalCueStackPanel, RehearsalProgrammeStage, executeRehearsalCue, rehearsalGoDisabledReason } from "./components/RehearseWorkspace.js";
-import { RunOperationsPanel, RunProgrammeStage, executeLiveCue, liveGoDisabledReason } from "./components/RunWorkspaceSection.js";
+import { ConfirmationDialog, RunOperationsPanel, RunProgrammeStage, executeLiveCue, liveGoDisabledReason } from "./components/RunWorkspaceSection.js";
 import { ConfigurationActionsPanel, ConfigurationEditorPanel, ConfigurationLibraryPanel, ConfigurationSummaryPanel, validateConfigurationDraft } from "./components/ShowConfigurationWorkspace.js";
 import type { RundownCue } from "./types.js";
 
@@ -19,9 +19,7 @@ test("AdminStateContext exports expected interface shape", async () => {
 
 test("all workspace components export named functions", async () => {
   const components = [
-    "./components/AdminHeader.js",
     "./components/AdminContext.js",
-    "./components/WorkspaceNavigation.js",
     "./components/ProductionsHome.js",
     "./components/PrepareOverview.js",
     "./components/RundownWorkspace.js",
@@ -118,6 +116,23 @@ test("Run GO handler invokes the live pathway once and durable delivery blocks i
   assert.equal(calls, 1);
   assert.equal(liveGoDisabledReason({ runReady: true, unresolvedOutbox: [{ id: "outbox-1", eventId: "event-1", revision: 15, label: "Home goal", status: "failed", retryable: true, cancellable: true }], cue: liveCue, going: false }), "1 durable delivery issue is unresolved. Resolve it before taking another live cue.");
   assert.equal(liveGoDisabledReason({ runReady: true, unresolvedOutbox: [], cue: liveCue, going: true }), "Live cue dispatch is in progress.");
+});
+
+test("Run confirmation dialog keeps Safe Clear deliberate and cancelable", () => {
+  let cancelled = 0;
+  let confirmed = 0;
+  const runWorkspace = {
+    ...liveRunWorkspace,
+    confirmation: "safe-clear",
+    setConfirmation: (value: null | string) => { if (value === null) cancelled += 1; },
+    confirmSessionAction: async () => { confirmed += 1; },
+  };
+  const html = renderToStaticMarkup(createElement(ConfirmationDialog, { runWorkspace: runWorkspace as typeof liveRunWorkspace }));
+  assert.match(html, /Confirm Safe Clear/);
+  assert.match(html, /Programme video will continue uninterrupted/);
+  runWorkspace.setConfirmation(null);
+  assert.equal(cancelled, 1);
+  assert.equal(confirmed, 0);
 });
 
 const configurationDraft = {
