@@ -8,7 +8,7 @@ import { PrepareOverview } from "./components/PrepareOverview.js";
 import { RundownCueEditor, RundownCueStackPanel, RundownElementsPanel, RundownProgrammeStage } from "./components/RundownWorkspace.js";
 import { ViewerPlacementEditor, ViewerProgrammeStage, ViewerSelectionPanel, ViewerStatusPanel } from "./components/ViewerWorkspace.js";
 import { ShowConfigurationWorkspace } from "./components/ShowConfigurationWorkspace.js";
-import { RehearseWorkspace } from "./components/RehearseWorkspace.js";
+import { RehearsalContextPanel, RehearsalCueStackPanel, RehearsalProgrammeStage, RehearsalResultPanel, useRehearsalWorkspace } from "./components/RehearseWorkspace.js";
 import { RunWorkspaceSection, ConfirmationDialog } from "./components/RunWorkspaceSection.js";
 import { DiagnosticsPanel } from "./components/DiagnosticsPanel.js";
 import { LegacyOverlay } from "./components/LegacyOverlay.js";
@@ -36,6 +36,7 @@ export default function App() {
   const rehearsal = workspace === "rehearse";
   const isRundownWorkspace = !isProductionsHome && workspace === "prepare" && prepareTab === "rundown";
   const isViewerWorkspace = !isProductionsHome && workspace === "prepare" && prepareTab === "viewer";
+  const isRehearseWorkspace = workspace === "rehearse";
 
   const navigate = useCallback((next: AdminRoute, replace = false) => {
     const path = adminPath(next);
@@ -87,6 +88,8 @@ export default function App() {
   }, [mutate, productionId, showConfig]);
 
   const runWorkspace = useRunWorkspace({ rundownId, rundown, sessionId, rehearsal, send, mutate, fetchRundown, fetchEvents, fetchOutbox, workspace });
+  const rehearsalWorkspace = useRehearsalWorkspace({ rundownId, rundown, sessionId, runWorkspace, mutate, fetchRundown });
+  const returnToPrepare = useCallback(() => navigate({ workspace: "prepare", productionId }), [navigate, productionId]);
 
   const previewRundownCue = useCallback(async (cue: RundownCue) => {
     setError(""); setStatus("");
@@ -155,7 +158,7 @@ export default function App() {
         <ShowConfigurationWorkspace showConfig={showConfig} />
       )}
 
-      {workspace === "rehearse" && <RehearseWorkspace playerPreviewUrl={playerPreviewUrl} previewProfile={previewProfile} setPreviewProfile={setPreviewProfile} rundowns={rundowns} rundown={rundown} rehearsal={rehearsal} runWorkspace={runWorkspace} fetchRundown={fetchRundown} />}
+      {isRehearseWorkspace && <RehearsalProgrammeStage ui={rehearsalWorkspace} previewProfile={previewProfile} playerPreviewUrl={playerPreviewUrl} />}
 
       {workspace === "run" && <RunWorkspaceSection rundowns={rundowns} rundown={rundown} selectedProduction={selectedProduction} disabledCueCount={disabledCueCount} apiConnection={apiConnection} streamConnection={streamConnection} sessionId={sessionId} unresolvedOutbox={unresolvedOutbox} programmePreviewUrl={programmePreviewUrl} runWorkspace={runWorkspace} setDiagnosticsOpen={setDiagnosticsOpen} />}
 
@@ -168,31 +171,31 @@ export default function App() {
     ? <RundownElementsPanel {...rundownShellProps} />
     : isViewerWorkspace
       ? <ViewerSelectionPanel {...viewerShellProps} />
+      : isRehearseWorkspace
+        ? <><AdminContext route={route} channels={channels} productions={productions} rundowns={rundowns} channelId={channelId} productionId={productionId} rundownId={rundownId} productionSwitchLocked={productionSwitchLocked} selectionError={selectionError} onChannelChange={setChannelId} onProductionChange={setProductionId} onRundownChange={setRundownId} /><RehearsalContextPanel previewProfile={previewProfile} setPreviewProfile={setPreviewProfile} sessionId={sessionId} returnToPrepare={returnToPrepare} /></>
     : <AdminContext route={route} channels={channels} productions={productions} rundowns={rundowns} channelId={channelId} productionId={productionId} rundownId={rundownId} productionSwitchLocked={productionSwitchLocked} selectionError={selectionError} onChannelChange={setChannelId} onProductionChange={setProductionId} onRundownChange={setRundownId} />;
 
   const centreBottom = isRundownWorkspace
     ? <RundownCueEditor rundownEditor={rundownEditor} commandBuilder={commandBuilder} />
     : isViewerWorkspace
       ? <ViewerPlacementEditor {...viewerShellProps} />
-    : <>
-    {workspace === "rehearse" && <section className="rehearsal-banner" role="status">
-      <strong>REHEARSAL OUTPUT ONLY</strong>
-      <span>Changes are visible only in opted-in rehearsal Players. Live presentation state will not change.</span>
-    </section>}
-    <section className="shell-context-panel" aria-label="Workspace context">
+    : isRehearseWorkspace
+      ? <RehearsalResultPanel ui={rehearsalWorkspace} rundownEditor={rundownEditor} sessionId={sessionId} />
+    : <section className="shell-context-panel" aria-label="Workspace context">
       <strong>{route.workspace === "productions" ? "Production library" : `${workspace} workspace`}</strong>
       <span>{workspace === "run" ? "Live controls remain in the active Run workspace." : "Select and operate within the active workspace above."}</span>
-    </section>
-  </>;
+    </section>;
 
   const farRight = isRundownWorkspace
     ? <RundownCueStackPanel rundownEditor={rundownEditor} commandBuilder={commandBuilder} rundown={rundown} previewCue={previewRundownCue} />
     : isViewerWorkspace
       ? <ViewerStatusPanel {...viewerShellProps} />
+    : isRehearseWorkspace
+      ? <RehearsalCueStackPanel ui={rehearsalWorkspace} rundown={rundown} rundownId={rundownId} returnToPrepare={returnToPrepare} />
     : diagnosticsOpen
     ? <DiagnosticsPanel workspace={workspace} events={events} outbox={outbox} resolveOutbox={resolveOutbox} />
     : <section className="shell-operations-panel" aria-label="Operational status">
-        <strong>{workspace === "run" ? "Live operation" : workspace === "rehearse" ? "Rehearsal output" : "Workspace status"}</strong>
+        <strong>{workspace === "run" ? "Live operation" : "Workspace status"}</strong>
         <span>{sessionId ? `Session ${sessionId}` : "No active execution session"}</span>
         <span>{unresolvedOutbox.length ? `${unresolvedOutbox.length} delivery issue${unresolvedOutbox.length === 1 ? "" : "s"}` : "No unresolved delivery issues"}</span>
         <button type="button" onClick={() => setDiagnosticsOpen(true)}>Open diagnostics</button>
