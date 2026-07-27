@@ -21,6 +21,7 @@ import { useRundownEditor } from "./hooks/useRundownEditor.js";
 import { useShowConfiguration } from "./hooks/useShowConfiguration.js";
 import { useRunWorkspace } from "./hooks/useRunWorkspace.js";
 import { AdminShell } from "./components/layout/AdminShell.js";
+import { TopBar } from "./components/layout/TopBar.js";
 
 export default function App() {
   const [route, setRoute] = useState<AdminRoute>(() => parseAdminRoute(window.location.pathname, window.location.search));
@@ -112,8 +113,7 @@ export default function App() {
     navigate({ workspace: "prepare", productionId, prepareTab: tab as AdminRoute["prepareTab"] });
   }, [navigate, productionId]);
 
-return <AdminStateContext.Provider value={adminState}>
-    <AdminShell>
+  const primaryWorkspace = <>
       {route.workspace === "productions" && <ProductionsHome channels={channels} productions={productions} rundowns={rundowns} setChannelId={setChannelId} setProductionId={setProductionId} createProduction={createProduction} refreshProductions={refreshProductions} />}
 
       {!isProductionsHome && workspace === "prepare" && prepareTab === "overview" && (
@@ -136,13 +136,49 @@ return <AdminStateContext.Provider value={adminState}>
 
       {workspace === "run" && <RunWorkspaceSection rundowns={rundowns} rundown={rundown} selectedProduction={selectedProduction} disabledCueCount={disabledCueCount} apiConnection={apiConnection} streamConnection={streamConnection} sessionId={sessionId} unresolvedOutbox={unresolvedOutbox} programmePreviewUrl={programmePreviewUrl} runWorkspace={runWorkspace} setDiagnosticsOpen={setDiagnosticsOpen} />}
 
-      <ConfirmationDialog runWorkspace={runWorkspace} />
-
       {workspace === "prepare" && <LegacyOverlay title={title} setTitle={setTitle} message={message} setMessage={setMessage} duration={duration} setDuration={setDuration} />}
+    </>;
 
-      {status && <p className="status-msg">{status}</p>}
-      {error && <p className="error-msg">{error}</p>}
-      {diagnosticsOpen && <DiagnosticsPanel workspace={workspace} events={events} outbox={outbox} resolveOutbox={resolveOutbox} />}
-    </AdminShell>
+  const farLeft = <AdminContext route={route} channels={channels} productions={productions} rundowns={rundowns} channelId={channelId} productionId={productionId} rundownId={rundownId} productionSwitchLocked={productionSwitchLocked} selectionError={selectionError} onChannelChange={setChannelId} onProductionChange={setProductionId} onRundownChange={setRundownId} />;
+
+  const centreBottom = <>
+    {workspace === "rehearse" && <section className="rehearsal-banner" role="status">
+      <strong>REHEARSAL OUTPUT ONLY</strong>
+      <span>Changes are visible only in opted-in rehearsal Players. Live presentation state will not change.</span>
+    </section>}
+    <section className="shell-context-panel" aria-label="Workspace context">
+      <strong>{route.workspace === "productions" ? "Production library" : `${workspace} workspace`}</strong>
+      <span>{workspace === "run" ? "Live controls remain in the active Run workspace." : "Select and operate within the active workspace above."}</span>
+    </section>
+  </>;
+
+  const farRight = diagnosticsOpen
+    ? <DiagnosticsPanel workspace={workspace} events={events} outbox={outbox} resolveOutbox={resolveOutbox} />
+    : <section className="shell-operations-panel" aria-label="Operational status">
+        <strong>{workspace === "run" ? "Live operation" : workspace === "rehearse" ? "Rehearsal output" : "Workspace status"}</strong>
+        <span>{sessionId ? `Session ${sessionId}` : "No active execution session"}</span>
+        <span>{unresolvedOutbox.length ? `${unresolvedOutbox.length} delivery issue${unresolvedOutbox.length === 1 ? "" : "s"}` : "No unresolved delivery issues"}</span>
+        <button type="button" onClick={() => setDiagnosticsOpen(true)}>Open diagnostics</button>
+      </section>;
+
+  const statusBar = <>
+    <span>API: {apiConnection}</span>
+    <span>Stream: {streamConnection}</span>
+    <span>{selectedProduction?.title ?? "No production selected"}</span>
+    {status && <span className="status-msg">{status}</span>}
+    {error && <span className="error-msg" role="alert">{error}</span>}
+  </>;
+
+  return <AdminStateContext.Provider value={adminState}>
+    <AdminShell
+      topBar={<TopBar apiConnection={apiConnection} streamConnection={streamConnection} workspace={route.workspace} productionId={productionId} selectedProduction={selectedProduction} diagnosticsOpen={diagnosticsOpen} onToggleDiagnostics={() => setDiagnosticsOpen((open) => !open)} onNavigateHome={() => navigate({ workspace: "productions" })} onNavigate={navigate} />}
+      farLeft={farLeft}
+      centreTop={primaryWorkspace}
+      centreBottom={centreBottom}
+      farRight={farRight}
+      statusBar={statusBar}
+    />
+
+    <ConfirmationDialog runWorkspace={runWorkspace} />
   </AdminStateContext.Provider>;
 }

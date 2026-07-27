@@ -37,8 +37,8 @@ export function TopBar({
   }
 
   return (
-    <header className="admin-shell__top-bar">
-      <div className="flex items-center px-4">
+    <div className="admin-top-bar">
+      <div className="admin-top-bar__identity">
         <div>
           <a
             className="admin-shell__brand"
@@ -50,13 +50,13 @@ export function TopBar({
           >
             ShowGather
           </a>
-          <p className="text-xs text-slate-600">{subtitle}</p>
+          <p>{subtitle}</p>
         </div>
       </div>
 
-      <nav className="flex items-center gap-1 px-2 overflow-x-auto" aria-label="Admin workspaces">
+      <nav className="admin-top-bar__navigation" aria-label="Admin workspaces">
         <button
-          className={`tab-button ${workspace === "productions" ? "aria-selected=\"true\"" : ""}`}
+          className={`tab-button ${workspace === "productions" ? "active" : ""}`}
           data-page="productions"
           aria-selected={workspace === "productions"}
           onClick={() => onNavigate({ workspace: "productions" })}
@@ -64,41 +64,44 @@ export function TopBar({
           Productions
         </button>
         <button
-          className={`tab-button ${workspace === "prepare" ? "aria-selected=\"true\"" : ""}`}
+          className={`tab-button ${workspace === "prepare" ? "active" : ""}`}
           data-page="prepare"
           aria-selected={workspace === "prepare"}
-          onClick={() => onNavigate({ workspace: "prepare" })}
+          disabled={!productionId}
+          onClick={() => onNavigate({ workspace: "prepare", productionId })}
         >
           Prepare
         </button>
         <button
-          className={`tab-button ${workspace === "rehearse" ? "aria-selected=\"true\"" : ""}`}
+          className={`tab-button ${workspace === "rehearse" ? "active" : ""}`}
           data-page="rehearse"
           aria-selected={workspace === "rehearse"}
-          onClick={() => onNavigate({ workspace: "rehearse" })}
+          disabled={!productionId}
+          onClick={() => onNavigate({ workspace: "rehearse", productionId })}
         >
           Rehearse
         </button>
         <button
-          className={`tab-button ${workspace === "run" ? "aria-selected=\"true\"" : ""}`}
+          className={`tab-button ${workspace === "run" ? "active" : ""}`}
           data-page="run"
           aria-selected={workspace === "run"}
-          onClick={() => onNavigate({ workspace: "run" })}
+          disabled={!productionId}
+          onClick={() => onNavigate({ workspace: "run", productionId })}
         >
           Run
         </button>
       </nav>
 
-      <div className="flex items-center justify-between px-3 gap-2">
+      <div className="admin-top-bar__context">
         {selectedProduction ? (
           <>
-            <div className="text-xs font-bold text-slate-600">Current production</div>
-            <div className="font-black">{selectedProduction.title}</div>
+            <span>Current production</span>
+            <strong>{selectedProduction.title}</strong>
           </>
         ) : (
-          <div className="text-xs font-bold text-slate-600">No production selected</div>
+          <span>No production selected</span>
         )}
-        <div className="flex gap-1 flex-wrap justify-end">
+        <div className="admin-top-bar__connections">
           <span className={`status status-${apiConnection === "connected" ? "healthy" : apiConnection === "checking" ? "warning" : "failed"}`}>
             API {apiConnection}
           </span>
@@ -115,6 +118,6 @@ export function TopBar({
           </button>
         </div>
       </div>
-    </header>
+    </div>
   );
 }

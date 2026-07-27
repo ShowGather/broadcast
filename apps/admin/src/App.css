@@ -33,71 +33,138 @@ body {
   padding: 24px 20px 48px;
 }
 
-/* ── Admin Shell — Matches wireframe exactly ──────────────────────────────── */
-/* Based on showgather-admin-wireframes.html */
-/* ── Admin Shell — Matches wireframe exactly ──────────────────────────────── */
-/* Based on showgather-admin-wireframes.html */
+/* ── Permanent Admin shell ────────────────────────────────────────────────── */
+/* Based on admin_layout_wireframe_studio_ui.html. */
 .admin-shell {
   display: grid;
   width: 100%;
   min-height: 100vh;
-  gap: 2px;
-  /* Grid template: 4 rows, 3 columns */
-  grid-template-rows: auto auto auto auto;
-  grid-template-columns: 240px 1fr 280px;
+  padding: 10px;
+  gap: 10px;
+  grid-template-columns: minmax(210px, 240px) minmax(0, 1fr) minmax(240px, 280px);
+  grid-template-rows: auto minmax(320px, 1fr) auto auto;
+  grid-template-areas:
+    "top-bar top-bar top-bar"
+    "far-left centre-top far-right"
+    "far-left centre-bottom far-right"
+    "status-bar status-bar status-bar";
+  overflow: hidden;
 }
 
-/* Grid areas */
 .admin-shell__top-bar {
-  grid-column: 1 / 4;
-  grid-row: 1;
+  grid-area: top-bar;
 }
 .admin-shell__far-left {
-  grid-column: 1;
-  grid-row: 2 / 4; /* span rows 2 and 3 */
+  grid-area: far-left;
 }
 .admin-shell__centre-top {
-  grid-column: 2;
-  grid-row: 2;
+  grid-area: centre-top;
 }
 .admin-shell__centre-bottom {
-  grid-column: 2;
-  grid-row: 3;
+  grid-area: centre-bottom;
 }
 .admin-shell__far-right {
-  grid-column: 3;
-  grid-row: 2 / 4; /* span rows 2 and 3 */
+  grid-area: far-right;
 }
 .admin-shell__status-bar {
-  grid-column: 1 / 4;
-  grid-row: 4;
+  grid-area: status-bar;
 }
 
-/* Responsive breakpoints from wireframe */
-@media (max-width: 1100px) {
+.admin-shell__top-bar,
+.admin-shell__far-left,
+.admin-shell__centre-top,
+.admin-shell__centre-bottom,
+.admin-shell__far-right,
+.admin-shell__status-bar {
+  min-width: 0;
+}
+
+.admin-shell__top-bar,
+.admin-shell__far-left,
+.admin-shell__centre-bottom,
+.admin-shell__far-right,
+.admin-shell__status-bar {
+  border: 1px solid #2a3445;
+  border-radius: 10px;
+  background: #121a26;
+}
+
+.admin-shell__top-bar { min-height: 64px; }
+.admin-shell__far-left,
+.admin-shell__far-right,
+.admin-shell__centre-top { min-height: 0; overflow: auto; }
+.admin-shell__centre-top { padding: 2px; }
+.admin-shell__centre-bottom { min-height: 86px; }
+.admin-shell__status-bar { min-height: 42px; }
+
+.admin-top-bar {
+  display: grid;
+  grid-template-columns: minmax(180px, .8fr) minmax(0, 1.2fr) minmax(220px, .9fr);
+  align-items: center;
+  gap: 14px;
+  min-height: 64px;
+  padding: 10px 14px;
+}
+.admin-top-bar__identity { min-width: 0; }
+.admin-shell__brand { color: #eef7ff; font-size: 1.25rem; font-weight: 760; letter-spacing: -.02em; text-decoration: none; }
+.admin-top-bar__identity p { margin-top: 4px; color: #8490a2; font-size: .78rem; line-height: 1.35; }
+.admin-top-bar__navigation { display: flex; justify-content: center; gap: 5px; min-width: 0; overflow-x: auto; }
+.tab-button { flex: 1 0 auto; border: 0; border-radius: 6px; padding: 8px 10px; background: transparent; color: #9fb0c5; cursor: pointer; font-size: .8rem; font-weight: 700; }
+.tab-button.active { background: #273d5b; color: #eff8ff; }
+.tab-button:disabled { cursor: not-allowed; opacity: .45; }
+.admin-top-bar__context { display: flex; align-items: center; justify-content: flex-end; gap: 10px; min-width: 0; color: #8490a2; font-size: .72rem; }
+.admin-top-bar__context > strong { min-width: 0; overflow: hidden; color: #eef7ff; font-size: .84rem; text-overflow: ellipsis; white-space: nowrap; }
+.admin-top-bar__connections { display: flex; justify-content: flex-end; flex-wrap: wrap; gap: 5px; }
+.admin-top-bar__connections .status { border: 1px solid #45536a; border-radius: 999px; padding: 4px 7px; font-size: .68rem; font-weight: 750; text-transform: capitalize; }
+.admin-top-bar__connections .status-healthy { border-color: #2f8158; color: #9be5b6; }
+.admin-top-bar__connections .status-warning { border-color: #b78c32; color: #ffe09a; }
+.admin-top-bar__connections .status-failed { border-color: #9d4040; color: #ffb3b3; }
+.diagnostics-toggle { border: 1px solid #4f5e72; border-radius: 5px; padding: 5px 8px; background: transparent; color: #b8c7da; cursor: pointer; font-size: .72rem; }
+
+.admin-shell__far-left { display: flex; flex-direction: column; gap: 10px; padding: 10px; }
+.admin-shell__nav { display: grid; gap: 5px; }
+.admin-shell__nav button { width: 100%; border: 0; border-radius: 6px; padding: 9px 10px; background: transparent; color: #9fb0c5; cursor: pointer; text-align: left; text-transform: capitalize; }
+.admin-shell__nav button.active { background: #273d5b; color: #eff8ff; font-weight: 750; }
+.admin-shell__nav button:disabled { cursor: not-allowed; opacity: .45; }
+.admin-context { padding: 12px; border-top: 1px solid #2a3445; }.admin-context h2 { margin-bottom: 10px; color: #dbe8f8; font-size: .9rem; text-transform: capitalize; }.admin-context .form { display: grid; gap: 10px; }.admin-context .form select { width: 100%; }
+
+.shell-context-panel,
+.shell-operations-panel { display: grid; gap: 7px; padding: 14px; color: #aebbd0; font-size: .82rem; }.shell-context-panel strong,
+.shell-operations-panel strong { color: #eef7ff; font-size: .9rem; }.shell-operations-panel button { justify-self: start; border: 1px solid #4d6584; border-radius: 6px; padding: 7px 9px; background: #1d3048; color: #eaf5ff; cursor: pointer; font-weight: 700; font-size: .76rem; }
+.admin-shell__status-bar { display: flex; align-items: center; flex-wrap: wrap; gap: 8px 16px; padding: 9px 13px; color: #9fb0c5; font-size: .75rem; }.admin-shell__status-bar .status-msg,
+.admin-shell__status-bar .error-msg { margin: 0; }
+
+/* Existing workspace components continue to own their internal composition.
+   The outer shell only keeps their minimum widths inside the centre region. */
+.admin-shell__centre-top .workspace-grid { max-width: none; }
+
+@media (max-width: 1200px) {
   .admin-shell {
-    grid-template-columns: 190px minmax(0,1fr) 240px;
+    grid-template-columns: minmax(175px, 190px) minmax(0, 1fr) minmax(200px, 240px);
   }
+  .admin-shell__centre-top .workspace-grid { display: flex; flex-direction: column; }
 }
 
 @media (max-width: 850px) {
   .admin-shell {
     grid-template-columns: 1fr;
-    grid-template-rows: auto auto auto auto auto auto; /* each zone gets its own row */
+    grid-template-rows: auto minmax(280px, auto) auto auto auto auto;
+    grid-template-areas:
+      "top-bar"
+      "centre-top"
+      "centre-bottom"
+      "far-left"
+      "far-right"
+      "status-bar";
+    overflow: visible;
   }
-  .admin-shell__top-bar { grid-column: 1; grid-row: 1; }
-  .admin-shell__far-left { grid-column: 1; grid-row: 2; }
-  .admin-shell__centre-top { grid-column: 1; grid-row: 3; }
-  .admin-shell__centre-bottom { grid-column: 1; grid-row: 4; }
-  .admin-shell__far-right { grid-column: 1; grid-row: 5; }
-  .admin-shell__status-bar { grid-column: 1; grid-row: 6; }
+  .admin-shell__far-left,
+  .admin-shell__far-right,
+  .admin-shell__centre-top { overflow: visible; }
+  .admin-top-bar { grid-template-columns: 1fr; gap: 8px; }
+  .admin-top-bar__navigation { justify-content: flex-start; }
+  .admin-top-bar__context { justify-content: space-between; }
 }
-
-/* Optional: set minimum heights for certain areas to avoid collapsing */
-.admin-shell__top-bar { min-height: 52px; }
-.admin-shell__status-bar { min-height: 40px; }
-/* The far-left and far-right can have min-width set via their column widths */
-/* The centre-top and centre-bottom will size according to content */
 
 /* Keep the existing workspace-grid and other styles below */
 .rehearsal-banner { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin: 16px 0; padding: 11px 13px; border: 1px solid #b78c32; border-radius: 8px; background: #2a210f; color: #ffe2a2; }.rehearsal-banner strong { letter-spacing: .07em; font-size: .78rem; }.rehearsal-banner span { color: #e6cea0; font-size: .82rem; }.rehearsal-console { border: 1px solid #8c7028; border-radius: 10px; padding: 16px; background: #1b170e; }.rehearsal-console .cue-grid button { border-color: #b78c32; background: #5b4216; color: #fff0c5; }

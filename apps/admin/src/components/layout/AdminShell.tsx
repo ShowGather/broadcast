@@ -1,8 +1,12 @@
 import { type ReactNode } from "react";
 
 interface AdminShellProps {
-  className?: string;
-  children: ReactNode;
+  topBar: ReactNode;
+  farLeft: ReactNode;
+  centreTop: ReactNode;
+  centreBottom: ReactNode;
+  farRight: ReactNode;
+  statusBar: ReactNode;
 }
 
 /**
@@ -21,13 +25,15 @@ interface AdminShellProps {
  *   <1100px:   reduce widths of side columns
  *   <850px:    stack vertically (top-bar, far-left, centre-top, centre-bottom, far-right, status-bar)
  */
-export function AdminShell({
-  className = "",
-  children,
-}: AdminShellProps) {
+export function AdminShell({ topBar, farLeft, centreTop, centreBottom, farRight, statusBar }: AdminShellProps) {
   return (
-    <div className={`admin-shell ${className}`}>
-      {children}
+    <div className="admin-shell">
+      <header className="admin-shell__top-bar">{topBar}</header>
+      <aside className="admin-shell__far-left">{farLeft}</aside>
+      <main className="admin-shell__centre-top">{centreTop}</main>
+      <section className="admin-shell__centre-bottom">{centreBottom}</section>
+      <aside className="admin-shell__far-right">{farRight}</aside>
+      <footer className="admin-shell__status-bar">{statusBar}</footer>
     </div>
   );
 }
