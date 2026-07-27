@@ -18,6 +18,8 @@ export function useShowConfiguration({ productionId, channelId, mutate, syncComm
   const [productionTitle, setProductionTitle] = useState("");
   const [productionDescription, setProductionDescription] = useState("");
   const [productionStatus, setProductionStatus] = useState("draft");
+  const [productionScheduledStart, setProductionScheduledStart] = useState("");
+  const [productionScheduledEnd, setProductionScheduledEnd] = useState("");
   const [configurationName, setConfigurationName] = useState("Football package");
   const [homeTeam, setHomeTeam] = useState("HOME");
   const [awayTeam, setAwayTeam] = useState("AWAY");
@@ -67,6 +69,7 @@ export function useShowConfiguration({ productionId, channelId, mutate, syncComm
     if (!response.ok) throw new Error("Unable to load production");
     const item = await response.json() as Production;
     setProductionTitle(item.title); setProductionDescription(item.description ?? ""); setProductionStatus(item.status);
+    setProductionScheduledStart(item.scheduledStart ?? ""); setProductionScheduledEnd(item.scheduledEnd ?? "");
     const configuration = item.configuration ?? {};
     const text = (key: string, fallback: string) => typeof configuration[key] === "string" ? configuration[key] as string : fallback;
     setHomeTeam(text("homeTeam", "HOME")); setAwayTeam(text("awayTeam", "AWAY")); setTickerLabel(text("tickerLabel", "LIVE")); setProgrammeTitle(text("programmeTitle", "")); setProgrammeSubtitle(text("programmeSubtitle", "")); setLiveLabel(text("liveLabel", "LIVE")); setAccent(text("accent", "#73e3ff"));
@@ -163,6 +166,8 @@ export function useShowConfiguration({ productionId, channelId, mutate, syncComm
     productionTitle, setProductionTitle,
     productionDescription, setProductionDescription,
     productionStatus, setProductionStatus,
+    productionScheduledStart, setProductionScheduledStart,
+    productionScheduledEnd, setProductionScheduledEnd,
     configurationName, setConfigurationName,
     homeTeam, setHomeTeam,
     awayTeam, setAwayTeam,

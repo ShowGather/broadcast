@@ -4,14 +4,13 @@ import { adminPath, parseAdminRoute, type AdminRoute } from "./routing.js";
 import { AdminContext } from "./components/AdminContext.js";
 import { AdminStateContext, type AdminStateValue } from "./components/AdminStateContext.js";
 import { ProductionsHome } from "./components/ProductionsHome.js";
-import { PrepareOverview } from "./components/PrepareOverview.js";
+import { PrepareNavigationPanel, PrepareProductionEditor, PrepareReadinessPanel, PrepareSummaryPanel, usePrepareWorkspace } from "./components/PrepareOverview.js";
 import { RundownCueEditor, RundownCueStackPanel, RundownElementsPanel, RundownProgrammeStage } from "./components/RundownWorkspace.js";
 import { ViewerPlacementEditor, ViewerProgrammeStage, ViewerSelectionPanel, ViewerStatusPanel } from "./components/ViewerWorkspace.js";
 import { ConfigurationActionsPanel, ConfigurationEditorPanel, ConfigurationLibraryPanel, ConfigurationSummaryPanel, useShowConfigurationWorkspace } from "./components/ShowConfigurationWorkspace.js";
 import { RehearsalContextPanel, RehearsalCueStackPanel, RehearsalProgrammeStage, RehearsalResultPanel, useRehearsalWorkspace } from "./components/RehearseWorkspace.js";
 import { ConfirmationDialog, RunContextPanel, RunDispatchPanel, RunOperationsPanel, RunProgrammeStage } from "./components/RunWorkspaceSection.js";
 import { DiagnosticsPanel } from "./components/DiagnosticsPanel.js";
-import { LegacyOverlay } from "./components/LegacyOverlay.js";
 import type { OutboxItem, RundownCue } from "./types.js";
 import { useSystemHealth } from "./hooks/useSystemHealth.js";
 import { useAdminSelectors } from "./hooks/useAdminSelectors.js";
@@ -37,6 +36,7 @@ export default function App() {
   const isRundownWorkspace = !isProductionsHome && workspace === "prepare" && prepareTab === "rundown";
   const isViewerWorkspace = !isProductionsHome && workspace === "prepare" && prepareTab === "viewer";
   const isShowConfigurationWorkspace = !isProductionsHome && workspace === "prepare" && prepareTab === "configuration";
+  const isPrepareOverviewWorkspace = !isProductionsHome && workspace === "prepare" && prepareTab === "overview";
   const isRehearseWorkspace = workspace === "rehearse";
 
   const navigate = useCallback((next: AdminRoute, replace = false) => {
@@ -85,6 +85,22 @@ export default function App() {
       "PUT",
       { configuration: showConfig.currentShowConfiguration() },
       "Production presentation saved",
+      showConfig.reloadProduction
+    );
+  }, [mutate, productionId, showConfig]);
+
+  const savePrepareProduction = useCallback(async () => {
+    return mutate(
+      `/api/productions/${productionId}`,
+      "PUT",
+      {
+        title: showConfig.productionTitle,
+        description: showConfig.productionDescription,
+        status: showConfig.productionStatus,
+        scheduledStart: showConfig.productionScheduledStart || null,
+        scheduledEnd: showConfig.productionScheduledEnd || null,
+      },
+      "Production saved",
       showConfig.reloadProduction
     );
   }, [mutate, productionId, showConfig]);
@@ -145,12 +161,31 @@ export default function App() {
     navigate({ workspace: "prepare", productionId, prepareTab: tab as AdminRoute["prepareTab"] });
   }, [navigate, productionId]);
 
+  const prepareShellProps = {
+    showConfig,
+    rundownEditor,
+    selectedProduction,
+    channels,
+    rundowns,
+    channelId,
+    productionId,
+    rundownId,
+    disabledCueCount,
+    apiConnection,
+    streamConnection,
+    createProduction: () => createProduction(),
+    duplicateProduction,
+    saveProduction: savePrepareProduction,
+    onNavigatePrepareTab: navigatePrepareTab,
+    onNavigateWorkspace: navigate,
+    legacyOverlay: { title, setTitle, message, setMessage, duration, setDuration },
+  };
+  const prepareWorkspace = usePrepareWorkspace(prepareShellProps);
+
   const primaryWorkspace = <>
       {route.workspace === "productions" && <ProductionsHome channels={channels} productions={productions} rundowns={rundowns} setChannelId={setChannelId} setProductionId={setProductionId} createProduction={createProduction} refreshProductions={refreshProductions} />}
 
-      {!isProductionsHome && workspace === "prepare" && prepareTab === "overview" && (
-        <PrepareOverview showConfig={showConfig} rundownEditor={rundownEditor} selectedProduction={selectedProduction} disabledCueCount={disabledCueCount} createProduction={() => createProduction()} duplicateProduction={duplicateProduction} onNavigate={navigatePrepareTab} />
-      )}
+      {isPrepareOverviewWorkspace && <PrepareSummaryPanel workspace={prepareWorkspace} />}
 
       {isRundownWorkspace && <RundownProgrammeStage rundownEditor={rundownEditor} previewProfile={previewProfile} setPreviewProfile={setPreviewProfile} realOutputUrl={layoutPreviewUrl} />}
 
@@ -162,7 +197,6 @@ export default function App() {
 
       {workspace === "run" && <RunProgrammeStage sessionId={sessionId} rundown={rundown} events={events} outbox={outbox} programmePreviewUrl={programmePreviewUrl} runWorkspace={runWorkspace} />}
 
-      {workspace === "prepare" && !isRundownWorkspace && !isViewerWorkspace && !isShowConfigurationWorkspace && <LegacyOverlay title={title} setTitle={setTitle} message={message} setMessage={setMessage} duration={duration} setDuration={setDuration} />}
     </>;
 
   const rundownShellProps = { productionId, rundownId, rundowns, rundown, rundownEditor, commandBuilder, setRundownId, refreshRundowns, mutate, previewProfile, setPreviewProfile, realOutputUrl: layoutPreviewUrl, previewCue: previewRundownCue };
@@ -172,6 +206,8 @@ export default function App() {
     ? <RundownElementsPanel {...rundownShellProps} />
     : isViewerWorkspace
       ? <ViewerSelectionPanel {...viewerShellProps} />
+    : isPrepareOverviewWorkspace
+      ? <PrepareNavigationPanel workspace={prepareWorkspace} />
     : isShowConfigurationWorkspace
       ? <ConfigurationLibraryPanel workspace={showConfigurationWorkspace} />
     : isRehearseWorkspace
@@ -184,6 +220,8 @@ export default function App() {
     ? <RundownCueEditor rundownEditor={rundownEditor} commandBuilder={commandBuilder} />
     : isViewerWorkspace
       ? <ViewerPlacementEditor {...viewerShellProps} />
+    : isPrepareOverviewWorkspace
+      ? <PrepareProductionEditor workspace={prepareWorkspace} />
     : isShowConfigurationWorkspace
       ? <ConfigurationEditorPanel workspace={showConfigurationWorkspace} />
     : isRehearseWorkspace
@@ -199,6 +237,8 @@ export default function App() {
     ? <RundownCueStackPanel rundownEditor={rundownEditor} commandBuilder={commandBuilder} rundown={rundown} previewCue={previewRundownCue} />
     : isViewerWorkspace
       ? <ViewerStatusPanel {...viewerShellProps} />
+    : isPrepareOverviewWorkspace
+      ? <PrepareReadinessPanel workspace={prepareWorkspace} />
     : isShowConfigurationWorkspace
       ? <ConfigurationActionsPanel workspace={showConfigurationWorkspace} />
     : isRehearseWorkspace
@@ -224,7 +264,7 @@ export default function App() {
 
   return <AdminStateContext.Provider value={adminState}>
     <AdminShell
-      className={isViewerWorkspace ? "admin-shell--viewer" : isShowConfigurationWorkspace ? "admin-shell--configuration" : workspace === "run" ? "admin-shell--run" : ""}
+      className={isViewerWorkspace ? "admin-shell--viewer" : isPrepareOverviewWorkspace ? "admin-shell--prepare" : isShowConfigurationWorkspace ? "admin-shell--configuration" : workspace === "run" ? "admin-shell--run" : ""}
       topBar={<TopBar apiConnection={apiConnection} streamConnection={streamConnection} workspace={route.workspace} productionId={productionId} selectedProduction={selectedProduction} diagnosticsOpen={diagnosticsOpen} onToggleDiagnostics={() => setDiagnosticsOpen((open) => !open)} onNavigateHome={() => navigate({ workspace: "productions" })} onNavigate={navigate} />}
       farLeft={farLeft}
       centreTop={primaryWorkspace}

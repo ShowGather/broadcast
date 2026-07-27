@@ -2,7 +2,8 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
-import type { AdminStateValue } from "./components/AdminStateContext.js";
+import { AdminStateContext, type AdminStateValue } from "./components/AdminStateContext.js";
+import { PrepareNavigationPanel, PrepareProductionEditor, PrepareReadinessPanel, PrepareSummaryPanel } from "./components/PrepareOverview.js";
 import { RehearsalCueStackPanel, RehearsalProgrammeStage, executeRehearsalCue, rehearsalGoDisabledReason } from "./components/RehearseWorkspace.js";
 import { RunOperationsPanel, RunProgrammeStage, executeLiveCue, liveGoDisabledReason } from "./components/RunWorkspaceSection.js";
 import { ConfigurationActionsPanel, ConfigurationEditorPanel, ConfigurationLibraryPanel, ConfigurationSummaryPanel, validateConfigurationDraft } from "./components/ShowConfigurationWorkspace.js";
@@ -219,4 +220,128 @@ test("Show Configuration shell panels do not render a programme Player or duplic
   assert.doesNotMatch(html, /player-preview/);
   assert.doesNotMatch(html, /Open real output/);
   assert.doesNotMatch(html, /Placement and appearance/);
+});
+
+function prepareWorkspaceMock(overrides: Record<string, unknown> = {}) {
+  return {
+    showConfig: {
+      productionTitle: "Cup Final 2026",
+      setProductionTitle: () => {},
+      productionDescription: "Final match",
+      setProductionDescription: () => {},
+      productionStatus: "rehearsal",
+      setProductionStatus: () => {},
+      productionScheduledStart: "2026-07-25T14:30:00.000Z",
+      setProductionScheduledStart: () => {},
+      productionScheduledEnd: "",
+      setProductionScheduledEnd: () => {},
+    },
+    rundownEditor: { rundownName: "V1 Demonstration", rundownDefinition: [{ id: "cue-1" }] },
+    selectedProduction: { id: "production-1", channelId: "channel-1", title: "Cup Final 2026", status: "rehearsal", configuration: { programmeTitle: "Cup Final 2026" }, scheduledStart: "2026-07-25T14:30:00.000Z" },
+    channels: [{ id: "channel-1", name: "Demo Channel", slug: "demo", status: "active" }],
+    rundowns: [{ id: "rundown-1", name: "V1 Demonstration", version: 1 }],
+    channelId: "channel-1",
+    productionId: "production-1",
+    rundownId: "rundown-1",
+    disabledCueCount: 0,
+    apiConnection: "connected",
+    streamConnection: "connected",
+    createProduction: async () => {},
+    duplicateProduction: async () => {},
+    saveProduction: async () => {},
+    onNavigatePrepareTab: () => {},
+    onNavigateWorkspace: () => {},
+    legacyOverlay: { title: "", setTitle: () => {}, message: "", setMessage: () => {}, duration: 5000, setDuration: () => {} },
+    readiness: {
+      hasProduction: true,
+      hasTitle: true,
+      hasRundown: true,
+      cueCount: 1,
+      hasCues: true,
+      hasConfiguration: true,
+      disabledCueCount: 0,
+      apiReady: true,
+      streamReady: true,
+    },
+    validationErrors: [],
+    saving: false,
+    save: async () => {},
+    ...overrides,
+  } as any;
+}
+
+function renderWithAdminState(element: ReturnType<typeof createElement>) {
+  const state: AdminStateValue = {
+    channelId: "channel-1",
+    productionId: "production-1",
+    rundownId: "rundown-1",
+    workspace: "prepare",
+    navigate: () => {},
+    mutate: async () => undefined,
+    send: () => {},
+    status: "",
+    setStatus: () => {},
+    error: "",
+    setError: () => {},
+  };
+  return renderToStaticMarkup(createElement(AdminStateContext.Provider, { value: state }, element));
+}
+
+test("Prepare summary renders for a selected production", () => {
+  const html = renderToStaticMarkup(createElement(PrepareSummaryPanel, { workspace: prepareWorkspaceMock() }));
+  assert.match(html, /Cup Final 2026/);
+  assert.match(html, /V1 Demonstration/);
+  assert.match(html, /Production configuration present/);
+});
+
+test("Prepare no-production state renders clearly", () => {
+  const html = renderToStaticMarkup(createElement(PrepareSummaryPanel, { workspace: prepareWorkspaceMock({ productionId: "", selectedProduction: undefined, readiness: { ...prepareWorkspaceMock().readiness, hasProduction: false } }) }));
+  assert.match(html, /No production selected/);
+  assert.match(html, /Create production/);
+});
+
+test("Prepare production editor renders selected production form values", () => {
+  const html = renderToStaticMarkup(createElement(PrepareProductionEditor, { workspace: prepareWorkspaceMock() }));
+  assert.match(html, /Cup Final 2026/);
+  assert.match(html, /Final match/);
+  assert.match(html, /Save production/);
+});
+
+test("Prepare save handler invokes the existing update pathway once", async () => {
+  let saves = 0;
+  const workspace = prepareWorkspaceMock({ save: async () => { saves += 1; } });
+  await workspace.save();
+  assert.equal(saves, 1);
+});
+
+test("Prepare save disabled and pending states are explicit", () => {
+  const invalid = renderToStaticMarkup(createElement(PrepareProductionEditor, { workspace: prepareWorkspaceMock({ validationErrors: ["Production title is required."] }) }));
+  const pending = renderToStaticMarkup(createElement(PrepareProductionEditor, { workspace: prepareWorkspaceMock({ saving: true }) }));
+  assert.match(invalid, /Production title is required/);
+  assert.match(invalid, /disabled=""/);
+  assert.match(pending, /Saving production/);
+});
+
+test("Prepare readiness and next actions preserve production context without live GO", () => {
+  const html = renderWithAdminState(createElement(PrepareReadinessPanel, { workspace: prepareWorkspaceMock() }));
+  assert.match(html, /Production details ready/);
+  assert.match(html, /Open rehearsal/);
+  assert.match(html, /Open Run gate/);
+  assert.doesNotMatch(html, />GO</);
+});
+
+test("Prepare navigation exposes setup sections and not operational controls", () => {
+  const html = renderToStaticMarkup(createElement(PrepareNavigationPanel, { workspace: prepareWorkspaceMock() }));
+  assert.match(html, /Overview/);
+  assert.match(html, /Rundown/);
+  assert.match(html, /Viewer/);
+  assert.match(html, /Show Configuration/);
+  assert.doesNotMatch(html, /Safe Clear/);
+});
+
+test("Prepare legacy overlay is retained only as secondary advanced content", () => {
+  const html = renderWithAdminState(createElement(PrepareReadinessPanel, { workspace: prepareWorkspaceMock() }));
+  assert.match(html, /Advanced legacy overlay controls/);
+  assert.match(html, /Custom legacy overlay/);
+  assert.doesNotMatch(renderToStaticMarkup(createElement(PrepareSummaryPanel, { workspace: prepareWorkspaceMock() })), /Custom legacy overlay/);
 });
