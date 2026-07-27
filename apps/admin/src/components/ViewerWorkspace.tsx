@@ -1,255 +1,104 @@
 import type { useShowConfiguration } from "../hooks/useShowConfiguration.js";
-import { useAdminState } from "./AdminStateContext.js";
-import { ThreeColumnWorkspace } from "./layout/ThreeColumnWorkspace.js";
-import { WorkspacePanel } from "./ui/WorkspacePanel.js";
+import type { LayoutAnchor, LayoutProfile, LayoutSurface } from "../types.js";
 import { ProfileSelector } from "./ui/ProfileSelector.js";
-import { PrimaryAction, SecondaryAction, DangerAction } from "./ui/ActionButtons.js";
-import { PlayerPreview } from "./ui/PlayerPreview.js";
+import { DangerAction, PrimaryAction, SecondaryAction } from "./ui/ActionButtons.js";
 
-interface Props {
+type Profile = "desktop" | "mobile" | "tv";
+type ElementKind = "scorebug" | "lower-third" | "ticker" | "alert" | "sponsor-panel" | "clock";
+const anchors: LayoutAnchor[] = ["top-left", "top-centre", "top-right", "centre-left", "centre", "centre-right", "bottom-left", "bottom-centre", "bottom-right"];
+const surfaces: LayoutSurface[] = ["video", "surround", "companion"];
+
+export interface ViewerShellProps {
   showConfig: ReturnType<typeof useShowConfiguration>;
-  previewProfile: "desktop" | "mobile" | "tv";
-  setPreviewProfile: (p: "desktop" | "mobile" | "tv") => void;
-  layoutPreviewUrl: string;
+  previewProfile: Profile;
+  setPreviewProfile: (profile: Profile) => void;
+  realOutputUrl: string;
+  saveProduction: () => Promise<void>;
 }
 
-export function ViewerWorkspace({ showConfig, previewProfile, setPreviewProfile, layoutPreviewUrl }: Props) {
-  const { setStatus, setError } = useAdminState();
+function instanceLabel(props: ViewerShellProps, id: string) {
+  if (!id) return "No instance selected";
+  return props.showConfig.presentationInstances.find((instance) => instance.id === id)?.label
+    ?? ({ scorebug: "Main scorebug", "lower-third": "Lower third", primary: "Sponsor panel", ticker: "Ticker" } as Record<string, string>)[id]
+    ?? id;
+}
 
-  const left = (
-    <WorkspacePanel heading="Viewer configuration">
-      <ProfileSelector
-        profiles={["desktop", "mobile", "tv"]}
-        selected={previewProfile}
-        onSelect={(p) => setPreviewProfile(p as "desktop" | "mobile" | "tv")}
-        label="Preview profile"
-      />
+function selectedLayout(props: ViewerShellProps) {
+  return props.showConfig.presentationLayouts.find((layout) => layout.instanceId === props.showConfig.layoutInstanceId);
+}
 
-      <div style={{ marginTop: 14 }}>
-        <h3 style={{ color: "#dbe8f8", fontSize: ".85rem", marginBottom: 8 }}>Elements library</h3>
-        <div className="element-library" role="list" aria-label="Presentation elements">
-          {(["scorebug", "lower-third", "ticker", "alert", "sponsor-panel", "clock"] as const).map((kind) => (
-            <button
-              key={kind}
-              type="button"
-              role="listitem"
-              draggable
-              className={showConfig.selectedElement === kind ? "active" : ""}
-              onDragStart={(event) => {
-                event.dataTransfer.setData("application/x-showgather-element", kind);
-                event.dataTransfer.effectAllowed = "copy";
-              }}
-              onClick={() => showConfig.chooseElement(kind)}
-            >
-              {kind === "sponsor-panel" ? "Sponsor bug" : kind.replace("-", " ")}
-            </button>
-          ))}
-        </div>
-      </div>
+function chooseInstance(props: ViewerShellProps, id: string) {
+  props.showConfig.setLayoutInstanceId(id);
+  const definition = props.showConfig.presentationLayouts.find((layout) => layout.instanceId === id);
+  const placement = definition?.placementByProfile[props.previewProfile];
+  if (!placement) return;
+  props.showConfig.setLayoutProfile(props.previewProfile);
+  props.showConfig.setLayoutSurface(placement.surface);
+  props.showConfig.setLayoutAnchor(placement.anchor);
+  props.showConfig.setLayoutX(placement.x);
+  props.showConfig.setLayoutY(placement.y);
+  props.showConfig.setLayoutWidth(placement.width);
+  props.showConfig.setLayoutHeight(placement.height ?? "");
+  props.showConfig.setLayoutOpacity(placement.opacity ?? 1);
+  props.showConfig.setLayoutRotation(placement.rotation ?? 0);
+  props.showConfig.setLayoutSafeArea(placement.safeArea ?? false);
+  props.showConfig.setLayoutPolicy(placement.layout ?? "overlay");
+  props.showConfig.setLayoutVariant(definition?.variantByProfile?.[props.previewProfile] ?? "standard");
+  props.showConfig.setLayoutZIndex(definition?.zIndex ?? 10);
+  props.showConfig.setTransitionKind(definition?.transition?.enter ?? "fade");
+  props.showConfig.setTransitionDuration(definition?.transition?.durationMs ?? 180);
+  props.showConfig.setLayoutCropTop(placement.crop?.top ?? 0);
+  props.showConfig.setLayoutCropRight(placement.crop?.right ?? 0);
+  props.showConfig.setLayoutCropBottom(placement.crop?.bottom ?? 0);
+  props.showConfig.setLayoutCropLeft(placement.crop?.left ?? 0);
+}
 
-      <div className="placement-zones" style={{ marginTop: 14 }} aria-label="Video placement presets">
-        <span>Drag an element onto a named placement preset</span>
-        <div>
-          {(["top-left", "top-centre", "top-right", "centre-left", "centre", "centre-right", "bottom-left", "bottom-centre", "bottom-right"] as const).map((anchor) => (
-            <button
-              key={anchor}
-              type="button"
-              onDragOver={(event) => event.preventDefault()}
-              onDrop={(event) => {
-                event.preventDefault();
-                const kind = event.dataTransfer.getData("application/x-showgather-element");
-                if (["scorebug", "lower-third", "ticker", "alert", "sponsor-panel", "clock"].includes(kind)) {
-                  showConfig.dropElementOnPreset(kind as "scorebug" | "lower-third" | "ticker" | "alert" | "sponsor-panel" | "clock", anchor);
-                }
-              }}
-              onClick={() => showConfig.dropElementOnPreset(showConfig.selectedElement as "scorebug" | "lower-third" | "ticker" | "alert" | "sponsor-panel" | "clock", anchor)}
-            >
-              {anchor.replace("-", " ")}
-            </button>
-          ))}
-        </div>
-      </div>
+export function ViewerSelectionPanel(props: ViewerShellProps) {
+  const { showConfig } = props;
+  return <section className="viewer-selection-panel" aria-label="Viewer profiles and presentation instances">
+    <div className="viewer-panel-heading"><span>Prepare</span><h2>Viewer</h2></div>
+    <ProfileSelector profiles={["desktop", "mobile", "tv"]} selected={props.previewProfile} onSelect={(profile) => { props.setPreviewProfile(profile as Profile); showConfig.setLayoutProfile(profile as LayoutProfile); }} label="Audience output profile" />
+    <SecondaryAction disabled={!showConfig.layoutInstanceId} onClick={() => showConfig.setLayoutInstanceId("")}>Clear instance selection</SecondaryAction>
+    <div className="viewer-element-library"><h3>Presentation elements</h3>{(["scorebug", "lower-third", "ticker", "alert", "sponsor-panel", "clock"] as ElementKind[]).map((kind) => <button key={kind} type="button" className={showConfig.selectedElement === kind ? "active" : ""} onClick={() => showConfig.chooseElement(kind)}><strong>{kind === "sponsor-panel" ? "Sponsor bug" : kind.replace("-", " ")}</strong></button>)}</div>
+    <div className="viewer-instance-create"><h3>Add presentation instance</h3><label><span>Instance ID</span><input value={showConfig.newInstanceId} onChange={(event) => showConfig.setNewInstanceId(event.target.value)} placeholder="presenter-b" /></label><label><span>Label</span><input value={showConfig.newInstanceLabel} onChange={(event) => showConfig.setNewInstanceLabel(event.target.value)} placeholder="Presenter B lower third" /></label><label><span>Component</span><select value={showConfig.newInstanceKind} onChange={(event) => showConfig.setNewInstanceKind(event.target.value as typeof showConfig.newInstanceKind)}>{(["lower-third", "scorebug", "ticker", "alert", "sponsor", "clock", "live-badge", "poll", "custom"] as const).map((kind) => <option key={kind}>{kind}</option>)}</select></label><PrimaryAction onClick={() => { const result = showConfig.addPresentationInstance(); if (typeof result.instanceId === "string") chooseInstance(props, result.instanceId); }}>Add instance</PrimaryAction></div>
+    <div className="viewer-instance-list"><h3>Presentation instances</h3>{showConfig.presentationInstances.length ? showConfig.presentationInstances.map((instance) => <div key={instance.id} className={instance.id === showConfig.layoutInstanceId ? "active" : ""}><button type="button" onClick={() => chooseInstance(props, instance.id)}><strong>{instance.label}</strong><span>{instance.kind} · {instance.enabled ? "Enabled" : "Disabled"}</span></button><div><button onClick={() => showConfig.setPresentationInstances((current) => current.map((item) => item.id === instance.id ? { ...item, enabled: !item.enabled } : item))}>{instance.enabled ? "Disable" : "Enable"}</button><SecondaryAction onClick={() => showConfig.duplicatePresentationInstance(instance.id)}>Duplicate</SecondaryAction><DangerAction onClick={() => showConfig.removePresentationInstance(instance.id)}>Delete</DangerAction></div></div>) : <p className="hint">No reusable instances are configured for this production.</p>}</div>
+    <fieldset className="viewer-companion-options"><legend>Companion panels</legend>{(["match", "info", "partners", "interact"] as const).map((panel) => <label key={panel}><input type="checkbox" checked={showConfig.enabledPanels.includes(panel)} onChange={() => showConfig.setEnabledPanels((current) => current.includes(panel) ? current.filter((item) => item !== panel) : [...current, panel])} /> {panel}</label>)}</fieldset>
+  </section>;
+}
 
-      <div style={{ marginTop: 14 }}>
-        <h3 style={{ color: "#dbe8f8", fontSize: ".85rem", marginBottom: 8 }}>Presentation instances</h3>
-        <div className="form">
-          <label>
-            <span>Instance ID</span>
-            <input value={showConfig.newInstanceId} onChange={(event) => showConfig.setNewInstanceId(event.target.value)} placeholder="presenter-b" />
-          </label>
-          <label>
-            <span>Label</span>
-            <input value={showConfig.newInstanceLabel} onChange={(event) => showConfig.setNewInstanceLabel(event.target.value)} placeholder="Presenter B lower third" />
-          </label>
-          <label>
-            <span>Component</span>
-            <select value={showConfig.newInstanceKind} onChange={(event) => showConfig.setNewInstanceKind(event.target.value as "lower-third" | "scorebug" | "ticker" | "alert" | "sponsor" | "clock" | "live-badge" | "poll" | "custom")}>
-              {(["lower-third", "scorebug", "ticker", "alert", "sponsor", "clock", "live-badge", "poll", "custom"] as const).map((kind) => (
-                <option key={kind}>{kind}</option>
-              ))}
-            </select>
-          </label>
-          <PrimaryAction onClick={() => {
-            const result = showConfig.addPresentationInstance();
-            if ("error" in result) {
-              setError(result.error!);
-            } else {
-              setStatus(result.success);
-              showConfig.setLayoutInstanceId(result.instanceId);
-            }
-          }}>
-            Add instance
-          </PrimaryAction>
-        </div>
+function anchorStyle(anchor: LayoutAnchor) {
+  const [vertical, horizontal] = anchor.split("-");
+  return { [vertical === "centre" ? "top" : vertical]: vertical === "centre" ? "50%" : "5%", [horizontal ?? "left"]: horizontal === "centre" || vertical === "centre" && !horizontal ? "50%" : "5%" } as Record<string, string>;
+}
 
-        {showConfig.presentationInstances.length > 0 && (
-          <ul className="placement-summary" style={{ marginTop: 12 }}>
-            {showConfig.presentationInstances.map((instance) => (
-              <li key={instance.id}>
-                <span><b>{instance.label}</b> · {instance.kind} · {instance.enabled ? "Enabled" : "Disabled"}</span>
-                <button onClick={() => { showConfig.setLayoutInstanceId(instance.id); }}>Select</button>
-                <button onClick={() => showConfig.setPresentationInstances((current) => current.map((item) => item.id === instance.id ? { ...item, enabled: !item.enabled } : item))}>
-                  {instance.enabled ? "Disable" : "Enable"}
-                </button>
-                <SecondaryAction onClick={() => showConfig.duplicatePresentationInstance(instance.id)}>
-                  Duplicate
-                </SecondaryAction>
-                <DangerAction onClick={() => showConfig.removePresentationInstance(instance.id)}>
-                  Delete
-                </DangerAction>
-              </li>
-            ))}
-          </ul>
-        )}
-      </div>
-    </WorkspacePanel>
-  );
+export function ViewerProgrammeStage(props: ViewerShellProps) {
+  const { showConfig } = props;
+  const layouts = showConfig.presentationLayouts.map((definition) => ({ definition, placement: definition.placementByProfile[props.previewProfile] })).filter((item) => item.placement);
+  const selectedId = showConfig.layoutInstanceId;
+  const renderItem = (item: typeof layouts[number]) => {
+    const placement = item.placement!;
+    const selected = item.definition.instanceId === selectedId;
+    return <div key={item.definition.instanceId} className={`viewer-stage__instance viewer-stage__instance--${placement.surface} ${selected ? "viewer-stage__instance--selected" : ""}`} style={{ ...anchorStyle(placement.anchor), width: `${Math.max(12, placement.width * 100)}%`, opacity: placement.opacity ?? 1, zIndex: item.definition.zIndex ?? 1, transform: `${placement.anchor.includes("centre") ? "translate(-50%, -50%) " : ""}rotate(${placement.rotation ?? 0}deg)` }}><span>{instanceLabel(props, item.definition.instanceId)}</span>{selected && <b>{placement.surface} · {placement.anchor}</b>}</div>;
+  };
+  const videoItems = layouts.filter((item) => item.placement?.surface === "video");
+  const surroundItems = layouts.filter((item) => item.placement?.surface === "surround");
+  return <section className="viewer-programme-stage" aria-label="Fitted audience composition preview"><div className="viewer-stage__heading"><div><span>Audience composition</span><h1>{instanceLabel(props, selectedId)}</h1></div><span className="viewer-stage__profile">{props.previewProfile} profile</span></div><div className={`viewer-stage__canvas viewer-stage__canvas--${props.previewProfile}`}><div className="viewer-stage__header">Header {surroundItems.filter((item) => item.placement?.anchor.startsWith("top")).map(renderItem)}</div><div className="viewer-stage__rail viewer-stage__rail--left">Left rail {surroundItems.filter((item) => item.placement?.anchor.endsWith("left") && !item.placement?.anchor.startsWith("top") && !item.placement?.anchor.startsWith("bottom")).map(renderItem)}</div><div className="viewer-stage__video"><span>16:9 video</span>{showConfig.layoutSafeArea && <div className="viewer-stage__safe-area" aria-label="Title and action safe area" />}{videoItems.map(renderItem)}{!layouts.length && <strong>No saved presentation layout</strong>}</div><div className="viewer-stage__rail viewer-stage__rail--right">Right rail {surroundItems.filter((item) => item.placement?.anchor.endsWith("right") && !item.placement?.anchor.startsWith("top") && !item.placement?.anchor.startsWith("bottom")).map(renderItem)}</div><div className="viewer-stage__footer">Footer {surroundItems.filter((item) => item.placement?.anchor.startsWith("bottom")).map(renderItem)}</div></div><p>Fitted configuration preview. Editing never dispatches a timed command.</p></section>;
+}
 
-  const centre = (
-    <WorkspacePanel heading="Placement editor">
-      <div className="form">
-        <label>
-          <span>Instance</span>
-          <select value={showConfig.layoutInstanceId} onChange={(event) => showConfig.setLayoutInstanceId(event.target.value)}>
-            <option value="scorebug">Main scorebug</option>
-            <option value="lower-third">Lower third</option>
-            <option value="primary">Sponsor panel</option>
-            <option value="ticker">Ticker</option>
-            {showConfig.presentationInstances.map((instance) => (
-              <option key={instance.id} value={instance.id}>{instance.label}{instance.enabled ? "" : " (disabled)"}</option>
-            ))}
-          </select>
-        </label>
+export function ViewerPlacementEditor(props: ViewerShellProps) {
+  const { showConfig } = props;
+  const hasSelection = Boolean(showConfig.layoutInstanceId);
+  if (!hasSelection) return <section className="viewer-placement-editor viewer-placement-editor--empty"><strong>No presentation instance selected</strong><span>Select an instance from the Viewer panel to edit its placement.</span></section>;
+  return <section className="viewer-placement-editor" aria-label="Placement and appearance controls"><div className="viewer-editor__heading"><div><span>Placement and appearance</span><h2>{instanceLabel(props, showConfig.layoutInstanceId)}</h2></div><span>{props.previewProfile}</span></div><div className="viewer-placement-editor__form form"><label><span>Instance</span><select value={showConfig.layoutInstanceId} onChange={(event) => chooseInstance(props, event.target.value)}><option value="scorebug">Main scorebug</option><option value="lower-third">Lower third</option><option value="primary">Sponsor panel</option><option value="ticker">Ticker</option>{showConfig.presentationInstances.map((instance) => <option key={instance.id} value={instance.id}>{instance.label}{instance.enabled ? "" : " (disabled)"}</option>)}</select></label><label><span>Surface</span><select value={showConfig.layoutSurface} onChange={(event) => showConfig.setLayoutSurface(event.target.value as LayoutSurface)}>{surfaces.map((surface) => <option key={surface}>{surface}</option>)}</select></label><label><span>Anchor</span><select value={showConfig.layoutAnchor} onChange={(event) => showConfig.setLayoutAnchor(event.target.value as LayoutAnchor)}>{anchors.map((anchor) => <option key={anchor}>{anchor}</option>)}</select></label><label><span>Profile variant</span><select value={showConfig.layoutVariant} onChange={(event) => showConfig.setLayoutVariant(event.target.value)}>{["standard", "wide", "broadcast", "compact", "headline"].map((variant) => <option key={variant}>{variant}</option>)}</select></label><div className="viewer-number-grid"><label><span>X</span><input type="number" min={0} max={1} step={.01} value={showConfig.layoutX} onChange={(event) => showConfig.setLayoutX(Number(event.target.value))} /></label><label><span>Y</span><input type="number" min={0} max={1} step={.01} value={showConfig.layoutY} onChange={(event) => showConfig.setLayoutY(Number(event.target.value))} /></label><label><span>Width</span><input type="number" min={.08} max={1} step={.01} value={showConfig.layoutWidth} onChange={(event) => showConfig.setLayoutWidth(Number(event.target.value))} /></label><label><span>Height</span><input type="number" min={0} max={1} step={.01} value={showConfig.layoutHeight} onChange={(event) => showConfig.setLayoutHeight(event.target.value === "" ? "" : Number(event.target.value))} /></label><label><span>Opacity</span><input type="number" min={0} max={1} step={.05} value={showConfig.layoutOpacity} onChange={(event) => showConfig.setLayoutOpacity(Number(event.target.value))} /></label><label><span>Rotation</span><input type="number" min={-180} max={180} step={1} value={showConfig.layoutRotation} onChange={(event) => showConfig.setLayoutRotation(Number(event.target.value))} /></label><label><span>Layer order</span><input type="number" min={0} max={999} step={1} value={showConfig.layoutZIndex} onChange={(event) => showConfig.setLayoutZIndex(Number(event.target.value))} /></label><label><span>Transition</span><select value={showConfig.transitionKind} onChange={(event) => showConfig.setTransitionKind(event.target.value as typeof showConfig.transitionKind)}>{["cut", "fade", "slide", "scale"].map((transition) => <option key={transition}>{transition}</option>)}</select></label></div><div className="viewer-crop-grid"><label><span>Crop top</span><input type="number" min={0} max={1} step={.01} value={showConfig.layoutCropTop} onChange={(event) => showConfig.setLayoutCropTop(Number(event.target.value))} /></label><label><span>Crop right</span><input type="number" min={0} max={1} step={.01} value={showConfig.layoutCropRight} onChange={(event) => showConfig.setLayoutCropRight(Number(event.target.value))} /></label><label><span>Crop bottom</span><input type="number" min={0} max={1} step={.01} value={showConfig.layoutCropBottom} onChange={(event) => showConfig.setLayoutCropBottom(Number(event.target.value))} /></label><label><span>Crop left</span><input type="number" min={0} max={1} step={.01} value={showConfig.layoutCropLeft} onChange={(event) => showConfig.setLayoutCropLeft(Number(event.target.value))} /></label></div><label className="viewer-safe-toggle"><input type="checkbox" checked={showConfig.layoutSafeArea} onChange={(event) => showConfig.setLayoutSafeArea(event.target.checked)} /><span>Title/action safe area</span></label><label><span>Collision policy</span><select value={showConfig.layoutPolicy} onChange={(event) => showConfig.setLayoutPolicy(event.target.value as typeof showConfig.layoutPolicy)}><option value="overlay">Overlay</option><option value="row">Stack in row</option><option value="column">Stack in column</option><option value="single">Single slot</option></select></label><label><span>Transition duration (ms)</span><input type="number" min={0} max={5000} step={10} value={showConfig.transitionDuration} onChange={(event) => showConfig.setTransitionDuration(Number(event.target.value))} /></label></div><div className="viewer-editor__actions"><PrimaryAction onClick={showConfig.saveLayoutPreset}>Apply placement</PrimaryAction><span>Apply updates this local production draft; save it from the status panel.</span></div></section>;
+}
 
-        <label>
-          <span>Profile</span>
-          <select value={showConfig.layoutProfile} onChange={(event) => showConfig.setLayoutProfile(event.target.value as "desktop" | "tv" | "mobile")}>
-            {(["desktop", "tv", "mobile"] as const).map((profile) => (
-              <option key={profile}>{profile}</option>
-            ))}
-          </select>
-        </label>
-
-        <label>
-          <span>Surface</span>
-          <select value={showConfig.layoutSurface} onChange={(event) => showConfig.setLayoutSurface(event.target.value as "video" | "surround" | "companion")}>
-            {(["video", "surround", "companion"] as const).map((surface) => (
-              <option key={surface}>{surface}</option>
-            ))}
-          </select>
-        </label>
-
-        <label>
-          <span>Preset</span>
-          <select value={showConfig.layoutAnchor} onChange={(event) => showConfig.setLayoutAnchor(event.target.value as "top-left" | "top-centre" | "top-right" | "centre-left" | "centre" | "centre-right" | "bottom-left" | "bottom-centre" | "bottom-right")}>
-            {(["top-left", "top-centre", "top-right", "centre-left", "centre", "centre-right", "bottom-left", "bottom-centre", "bottom-right"] as const).map((anchor) => (
-              <option key={anchor}>{anchor}</option>
-            ))}
-          </select>
-        </label>
-
-        <label>
-          <span>Profile variant</span>
-          <select value={showConfig.layoutVariant} onChange={(event) => showConfig.setLayoutVariant(event.target.value)}>
-            <option value="standard">Standard</option>
-            <option value="wide">Wide</option>
-            <option value="broadcast">Broadcast</option>
-            <option value="compact">Compact</option>
-            <option value="headline">Headline</option>
-          </select>
-        </label>
-
-        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
-          <label><span>Horizontal offset</span><input type="number" min={0} max={1} step={.01} value={showConfig.layoutX} onChange={(event) => showConfig.setLayoutX(Number(event.target.value))} /></label>
-          <label><span>Vertical offset</span><input type="number" min={0} max={1} step={.01} value={showConfig.layoutY} onChange={(event) => showConfig.setLayoutY(Number(event.target.value))} /></label>
-          <label><span>Width</span><input type="number" min={.08} max={1} step={.01} value={showConfig.layoutWidth} onChange={(event) => showConfig.setLayoutWidth(Number(event.target.value))} /></label>
-          <label><span>Height (optional)</span><input type="number" min={0} max={1} step={.01} value={showConfig.layoutHeight} onChange={(event) => showConfig.setLayoutHeight(event.target.value === "" ? "" : Number(event.target.value))} /></label>
-          <label><span>Opacity</span><input type="number" min={0} max={1} step={.05} value={showConfig.layoutOpacity} onChange={(event) => showConfig.setLayoutOpacity(Number(event.target.value))} /></label>
-          <label><span>Rotation</span><input type="number" min={-180} max={180} step={1} value={showConfig.layoutRotation} onChange={(event) => showConfig.setLayoutRotation(Number(event.target.value))} /></label>
-        </div>
-
-        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr 1fr", gap: 8 }}>
-          <label><span>Crop top</span><input type="number" min={0} max={1} step={.01} value={showConfig.layoutCropTop} onChange={(event) => showConfig.setLayoutCropTop(Number(event.target.value))} /></label>
-          <label><span>Crop right</span><input type="number" min={0} max={1} step={.01} value={showConfig.layoutCropRight} onChange={(event) => showConfig.setLayoutCropRight(Number(event.target.value))} /></label>
-          <label><span>Crop bottom</span><input type="number" min={0} max={1} step={.01} value={showConfig.layoutCropBottom} onChange={(event) => showConfig.setLayoutCropBottom(Number(event.target.value))} /></label>
-          <label><span>Crop left</span><input type="number" min={0} max={1} step={.01} value={showConfig.layoutCropLeft} onChange={(event) => showConfig.setLayoutCropLeft(Number(event.target.value))} /></label>
-        </div>
-
-        <label>
-          <span>Collision policy</span>
-          <select value={showConfig.layoutPolicy} onChange={(event) => showConfig.setLayoutPolicy(event.target.value as "single" | "row" | "column" | "overlay")}>
-            <option value="overlay">Overlay</option>
-            <option value="row">Stack in row</option>
-            <option value="column">Stack in column</option>
-            <option value="single">Single slot</option>
-          </select>
-        </label>
-
-        <label>
-          <span>Title/action safe area</span>
-          <input type="checkbox" checked={showConfig.layoutSafeArea} onChange={(event) => showConfig.setLayoutSafeArea(event.target.checked)} />
-        </label>
-
-        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
-          <label><span>Layer order</span><input type="number" min={0} max={999} step={1} value={showConfig.layoutZIndex} onChange={(event) => showConfig.setLayoutZIndex(Number(event.target.value))} /></label>
-          <label><span>Transition</span><select value={showConfig.transitionKind} onChange={(event) => showConfig.setTransitionKind(event.target.value as "cut" | "fade" | "slide" | "scale")}>
-            <option value="cut">Cut</option>
-            <option value="fade">Fade</option>
-            <option value="slide">Slide</option>
-            <option value="scale">Scale</option>
-          </select></label>
-          <label><span>Transition duration (ms)</span><input type="number" min={0} max={5000} step={10} value={showConfig.transitionDuration} onChange={(event) => showConfig.setTransitionDuration(Number(event.target.value))} /></label>
-        </div>
-
-        <PrimaryAction onClick={showConfig.saveLayoutPreset}>
-          Apply preset
-        </PrimaryAction>
-      </div>
-
-      {showConfig.presentationLayouts.length > 0 && (
-        <ul className="placement-summary" style={{ marginTop: 14 }}>
-          {showConfig.presentationLayouts.map((definition) => (
-            <li key={definition.instanceId}>
-              <span><b>{definition.instanceId}</b> · {Object.entries(definition.placementByProfile).map(([profile, placement]) => `${profile}: ${placement?.surface} ${placement?.anchor}`).join(" · ")}</span>
-              <button onClick={() => { showConfig.setLayoutInstanceId(definition.instanceId); setStatus(`${definition.instanceId} selected for placement editing.`); }}>Edit</button>
-              <SecondaryAction onClick={() => showConfig.duplicateLayoutDefinition(definition.instanceId)}>Duplicate</SecondaryAction>
-              <DangerAction onClick={() => showConfig.removeLayoutDefinition(definition.instanceId)}>Remove</DangerAction>
-            </li>
-          ))}
-        </ul>
-      )}
-    </WorkspacePanel>
-  );
-
-  const right = (
-    <WorkspacePanel heading="Player preview" variant="preview">
-      <PlayerPreview
-        url={layoutPreviewUrl}
-        title={`Placement Player ${previewProfile} preview`}
-        profile={previewProfile}
-      />
-    </WorkspacePanel>
-  );
-
-  return <ThreeColumnWorkspace left={left} centre={centre} right={right} />;
+export function ViewerStatusPanel(props: ViewerShellProps) {
+  const definition = selectedLayout(props);
+  const placement = definition?.placementByProfile[props.previewProfile];
+  const instance = props.showConfig.presentationInstances.find((item) => item.id === props.showConfig.layoutInstanceId);
+  const errors: string[] = [];
+  if (props.showConfig.layoutWidth < .08 || props.showConfig.layoutWidth > 1) errors.push("Width must be between 0.08 and 1.");
+  if (props.showConfig.layoutX < 0 || props.showConfig.layoutX > 1 || props.showConfig.layoutY < 0 || props.showConfig.layoutY > 1) errors.push("Position must use normalised values from 0 to 1.");
+  const warning = placement?.surface === "video" && !placement.safeArea ? "Video placement is not constrained to the title/action safe area." : null;
+  return <section className="viewer-status-panel" aria-label="Viewer configuration status"><div className="viewer-panel-heading"><span>Selected instance</span><h2>{instanceLabel(props, props.showConfig.layoutInstanceId)}</h2></div>{props.showConfig.layoutInstanceId ? <><dl><div><dt>Profile</dt><dd>{props.previewProfile}</dd></div><div><dt>Surface</dt><dd>{placement?.surface ?? props.showConfig.layoutSurface}</dd></div><div><dt>Anchor</dt><dd>{placement?.anchor ?? props.showConfig.layoutAnchor}</dd></div><div><dt>Save state</dt><dd>Explicit save required</dd></div></dl>{instance && <p className={instance.enabled ? "viewer-status--ok" : "viewer-status--warning"}>{instance.enabled ? "Instance is enabled." : "Instance is disabled."}</p>}{warning && <p className="viewer-status--warning">{warning}</p>}{errors.length ? <div className="viewer-status--error" role="alert">{errors.map((error) => <p key={error}>{error}</p>)}</div> : <p className="viewer-status--ok">Placement values are within supported bounds.</p>}</> : <p className="hint">Choose an instance to inspect its placement and validation.</p>}<p className="viewer-status__note">The current model records collision policy but does not calculate collisions, so no collision warning is shown.</p><PrimaryAction disabled={errors.length > 0} onClick={props.saveProduction}>Save into this production</PrimaryAction>{props.realOutputUrl ? <a className="viewer-open-output" href={props.realOutputUrl} target="_blank" rel="noreferrer">Open real output</a> : <span className="hint">Choose a channel to open real output.</span>}</section>;
 }

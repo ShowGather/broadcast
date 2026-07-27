@@ -7,6 +7,7 @@ interface AdminShellProps {
   centreBottom: ReactNode;
   farRight: ReactNode;
   statusBar: ReactNode;
+  className?: string;
 }
 
 /**
@@ -25,9 +26,9 @@ interface AdminShellProps {
  *   <1100px:   reduce widths of side columns
  *   <850px:    stack vertically (top-bar, far-left, centre-top, centre-bottom, far-right, status-bar)
  */
-export function AdminShell({ topBar, farLeft, centreTop, centreBottom, farRight, statusBar }: AdminShellProps) {
+export function AdminShell({ topBar, farLeft, centreTop, centreBottom, farRight, statusBar, className = "" }: AdminShellProps) {
   return (
-    <div className="admin-shell">
+    <div className={`admin-shell ${className}`.trim()}>
       <header className="admin-shell__top-bar">{topBar}</header>
       <aside className="admin-shell__far-left">{farLeft}</aside>
       <main className="admin-shell__centre-top">{centreTop}</main>

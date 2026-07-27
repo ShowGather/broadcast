@@ -73,8 +73,13 @@ export function useShowConfiguration({ productionId, channelId, mutate, syncComm
     const panels = configuration.enabledCompanionPanels; if (Array.isArray(panels) && panels.every((panel) => typeof panel === "string")) setEnabledPanels(panels as string[]);
     const labels = configuration.companionPanelLabels as Record<string, unknown> | undefined;
     setMatchPanelLabel(typeof labels?.match === "string" ? labels.match : "Match"); setInfoPanelLabel(typeof labels?.info === "string" ? labels.info : "Info"); setPartnersPanelLabel(typeof labels?.partners === "string" ? labels.partners : "Partners"); setInteractPanelLabel(typeof labels?.interact === "string" ? labels.interact : "Interact");
-    setPresentationLayouts(Array.isArray(configuration.presentationLayouts) ? configuration.presentationLayouts as LayoutDefinition[] : []);
-    setPresentationInstances(Array.isArray(configuration.presentationInstances) ? configuration.presentationInstances as PresentationInstanceDefinition[] : []);
+    const nextLayouts = Array.isArray(configuration.presentationLayouts) ? configuration.presentationLayouts as LayoutDefinition[] : [];
+    const nextInstances = Array.isArray(configuration.presentationInstances) ? configuration.presentationInstances as PresentationInstanceDefinition[] : [];
+    setPresentationLayouts(nextLayouts);
+    setPresentationInstances(nextInstances);
+    setLayoutInstanceId((current) => nextLayouts.some((layout) => layout.instanceId === current) || nextInstances.some((instance) => instance.id === current) || ["scorebug", "lower-third", "primary", "ticker"].includes(current)
+      ? current
+      : nextLayouts[0]?.instanceId ?? nextInstances[0]?.id ?? "scorebug");
   }, [productionId]);
 
   useEffect(() => { reloadProduction().catch(() => {}); }, [reloadProduction]);
@@ -115,13 +120,21 @@ export function useShowConfiguration({ productionId, channelId, mutate, syncComm
     setPresentationInstances((current) => [...current, { id, label, kind: newInstanceKind, enabled: true }]); setLayoutInstanceId(id); setNewInstanceId(""); setNewInstanceLabel(""); return { success: `${label} added to the reusable instance library.`, instanceId: id };
   }, [newInstanceId, newInstanceLabel, newInstanceKind, presentationInstances]);
 
-  const duplicatePresentationInstance = useCallback((id: string) => setPresentationInstances((current) => {
-    const source = current.find((instance) => instance.id === id); if (!source) return current; let copyId = `${id}-copy`; let suffix = 2;
-    while (current.some((instance) => instance.id === copyId)) copyId = `${id}-copy-${suffix++}`;
-    return [...current, { ...source, id: copyId, label: `${source.label} copy`, enabled: false }];
-  }), []);
+  const duplicatePresentationInstance = useCallback((id: string) => {
+    const source = presentationInstances.find((instance) => instance.id === id); if (!source) return;
+    let copyId = `${id}-copy`; let suffix = 2;
+    while (presentationInstances.some((instance) => instance.id === copyId)) copyId = `${id}-copy-${suffix++}`;
+    setPresentationInstances((current) => [...current, { ...source, id: copyId, label: `${source.label} copy`, enabled: false }]);
+    const sourceLayout = presentationLayouts.find((layout) => layout.instanceId === id);
+    if (sourceLayout) setPresentationLayouts((current) => [...current, { ...sourceLayout, instanceId: copyId }]);
+    setLayoutInstanceId(copyId);
+  }, [presentationInstances, presentationLayouts]);
 
-  const removePresentationInstance = useCallback((id: string) => { setPresentationInstances((current) => current.filter((instance) => instance.id !== id)); setPresentationLayouts((current) => current.filter((layout) => layout.instanceId !== id)); }, []);
+  const removePresentationInstance = useCallback((id: string) => {
+    setPresentationInstances((current) => current.filter((instance) => instance.id !== id));
+    setPresentationLayouts((current) => current.filter((layout) => layout.instanceId !== id));
+    setLayoutInstanceId((current) => current === id ? "scorebug" : current);
+  }, []);
 
   const chooseElement = useCallback((kind: "scorebug" | "lower-third" | "ticker" | "alert" | "sponsor-panel" | "clock") => {
     const defaults: Record<typeof kind, { instanceId: string; command?: string; surface: LayoutSurface; anchor: LayoutAnchor }> = {

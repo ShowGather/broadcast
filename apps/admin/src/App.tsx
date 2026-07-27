@@ -6,7 +6,7 @@ import { AdminStateContext, type AdminStateValue } from "./components/AdminState
 import { ProductionsHome } from "./components/ProductionsHome.js";
 import { PrepareOverview } from "./components/PrepareOverview.js";
 import { RundownCueEditor, RundownCueStackPanel, RundownElementsPanel, RundownProgrammeStage } from "./components/RundownWorkspace.js";
-import { ViewerWorkspace } from "./components/ViewerWorkspace.js";
+import { ViewerPlacementEditor, ViewerProgrammeStage, ViewerSelectionPanel, ViewerStatusPanel } from "./components/ViewerWorkspace.js";
 import { ShowConfigurationWorkspace } from "./components/ShowConfigurationWorkspace.js";
 import { RehearseWorkspace } from "./components/RehearseWorkspace.js";
 import { RunWorkspaceSection, ConfirmationDialog } from "./components/RunWorkspaceSection.js";
@@ -35,6 +35,7 @@ export default function App() {
   const prepareTab = route.prepareTab ?? "overview";
   const rehearsal = workspace === "rehearse";
   const isRundownWorkspace = !isProductionsHome && workspace === "prepare" && prepareTab === "rundown";
+  const isViewerWorkspace = !isProductionsHome && workspace === "prepare" && prepareTab === "viewer";
 
   const navigate = useCallback((next: AdminRoute, replace = false) => {
     const path = adminPath(next);
@@ -74,6 +75,16 @@ export default function App() {
     productionId, channelId, mutate,
     syncCommandFields: (kind, instanceId) => { commandBuilder.setCommandKind(kind); commandBuilder.setCommandInstanceId(instanceId); },
   });
+
+  const saveViewerProduction = useCallback(async () => {
+    await mutate(
+      `/api/productions/${productionId}`,
+      "PUT",
+      { configuration: showConfig.currentShowConfiguration() },
+      "Production presentation saved",
+      showConfig.reloadProduction
+    );
+  }, [mutate, productionId, showConfig]);
 
   const runWorkspace = useRunWorkspace({ rundownId, rundown, sessionId, rehearsal, send, mutate, fetchRundown, fetchEvents, fetchOutbox, workspace });
 
@@ -138,9 +149,7 @@ export default function App() {
 
       {isRundownWorkspace && <RundownProgrammeStage rundownEditor={rundownEditor} previewProfile={previewProfile} setPreviewProfile={setPreviewProfile} realOutputUrl={layoutPreviewUrl} />}
 
-      {!isProductionsHome && workspace === "prepare" && prepareTab === "viewer" && (
-        <ViewerWorkspace showConfig={showConfig} previewProfile={previewProfile} setPreviewProfile={setPreviewProfile} layoutPreviewUrl={layoutPreviewUrl} />
-      )}
+      {isViewerWorkspace && <ViewerProgrammeStage showConfig={showConfig} previewProfile={previewProfile} setPreviewProfile={setPreviewProfile} realOutputUrl={layoutPreviewUrl} saveProduction={saveViewerProduction} />}
 
       {!isProductionsHome && workspace === "prepare" && prepareTab === "configuration" && (
         <ShowConfigurationWorkspace showConfig={showConfig} />
@@ -150,16 +159,21 @@ export default function App() {
 
       {workspace === "run" && <RunWorkspaceSection rundowns={rundowns} rundown={rundown} selectedProduction={selectedProduction} disabledCueCount={disabledCueCount} apiConnection={apiConnection} streamConnection={streamConnection} sessionId={sessionId} unresolvedOutbox={unresolvedOutbox} programmePreviewUrl={programmePreviewUrl} runWorkspace={runWorkspace} setDiagnosticsOpen={setDiagnosticsOpen} />}
 
-      {workspace === "prepare" && !isRundownWorkspace && <LegacyOverlay title={title} setTitle={setTitle} message={message} setMessage={setMessage} duration={duration} setDuration={setDuration} />}
+      {workspace === "prepare" && !isRundownWorkspace && !isViewerWorkspace && <LegacyOverlay title={title} setTitle={setTitle} message={message} setMessage={setMessage} duration={duration} setDuration={setDuration} />}
     </>;
 
   const rundownShellProps = { productionId, rundownId, rundowns, rundown, rundownEditor, commandBuilder, setRundownId, refreshRundowns, mutate, previewProfile, setPreviewProfile, realOutputUrl: layoutPreviewUrl, previewCue: previewRundownCue };
+  const viewerShellProps = { showConfig, previewProfile, setPreviewProfile, realOutputUrl: layoutPreviewUrl, saveProduction: saveViewerProduction };
   const farLeft = isRundownWorkspace
     ? <RundownElementsPanel {...rundownShellProps} />
+    : isViewerWorkspace
+      ? <ViewerSelectionPanel {...viewerShellProps} />
     : <AdminContext route={route} channels={channels} productions={productions} rundowns={rundowns} channelId={channelId} productionId={productionId} rundownId={rundownId} productionSwitchLocked={productionSwitchLocked} selectionError={selectionError} onChannelChange={setChannelId} onProductionChange={setProductionId} onRundownChange={setRundownId} />;
 
   const centreBottom = isRundownWorkspace
     ? <RundownCueEditor rundownEditor={rundownEditor} commandBuilder={commandBuilder} />
+    : isViewerWorkspace
+      ? <ViewerPlacementEditor {...viewerShellProps} />
     : <>
     {workspace === "rehearse" && <section className="rehearsal-banner" role="status">
       <strong>REHEARSAL OUTPUT ONLY</strong>
@@ -173,6 +187,8 @@ export default function App() {
 
   const farRight = isRundownWorkspace
     ? <RundownCueStackPanel rundownEditor={rundownEditor} commandBuilder={commandBuilder} rundown={rundown} previewCue={previewRundownCue} />
+    : isViewerWorkspace
+      ? <ViewerStatusPanel {...viewerShellProps} />
     : diagnosticsOpen
     ? <DiagnosticsPanel workspace={workspace} events={events} outbox={outbox} resolveOutbox={resolveOutbox} />
     : <section className="shell-operations-panel" aria-label="Operational status">
@@ -192,6 +208,7 @@ export default function App() {
 
   return <AdminStateContext.Provider value={adminState}>
     <AdminShell
+      className={isViewerWorkspace ? "admin-shell--viewer" : ""}
       topBar={<TopBar apiConnection={apiConnection} streamConnection={streamConnection} workspace={route.workspace} productionId={productionId} selectedProduction={selectedProduction} diagnosticsOpen={diagnosticsOpen} onToggleDiagnostics={() => setDiagnosticsOpen((open) => !open)} onNavigateHome={() => navigate({ workspace: "productions" })} onNavigate={navigate} />}
       farLeft={farLeft}
       centreTop={primaryWorkspace}
