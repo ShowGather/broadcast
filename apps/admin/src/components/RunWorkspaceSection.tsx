@@ -1,16 +1,13 @@
-import type { RundownCue, OutboxItem } from "../types.js";
+import type { OutboxItem, RundownCue, StoredEvent } from "../types.js";
 import type { useRunWorkspace } from "../hooks/useRunWorkspace.js";
-import { useAdminState } from "./AdminStateContext.js";
-import { ThreeColumnWorkspace } from "./layout/ThreeColumnWorkspace.js";
-import { WorkspacePanel } from "./ui/WorkspacePanel.js";
 import { CueList, CueListItem } from "./ui/CueList.js";
+import { DangerAction, PrimaryAction, SafetyAction, SecondaryAction } from "./ui/ActionButtons.js";
 import { StatusBadge } from "./ui/StatusBadge.js";
-import { PrimaryAction, SecondaryAction, DangerAction, SafetyAction } from "./ui/ActionButtons.js";
-import { PlayerPreview } from "./ui/PlayerPreview.js";
 import { ValidationMessage } from "./ui/ValidationMessage.js";
 
-interface Props {
+export interface RunShellProps {
   rundowns: { id: string; name: string }[];
+  rundownId: string;
   rundown: RundownCue[];
   selectedProduction: { title?: string } | undefined;
   disabledCueCount: number;
@@ -18,144 +15,102 @@ interface Props {
   streamConnection: string;
   sessionId: string;
   unresolvedOutbox: OutboxItem[];
+  outbox: OutboxItem[];
+  events: StoredEvent[];
   programmePreviewUrl: string;
+  status: string;
+  error: string;
   runWorkspace: ReturnType<typeof useRunWorkspace>;
-  setDiagnosticsOpen: (open: boolean) => void;
+  resolveOutbox: (item: OutboxItem, action: "retry" | "cancel") => Promise<void>;
 }
 
-export function RunWorkspaceSection({ rundowns, rundown, selectedProduction, disabledCueCount, apiConnection, streamConnection, sessionId, unresolvedOutbox, programmePreviewUrl, runWorkspace, setDiagnosticsOpen }: Props) {
-  const { rundownId } = useAdminState();
+export function liveGoDisabledReason({ runReady, unresolvedOutbox, cue, going }: { runReady: boolean; unresolvedOutbox: OutboxItem[]; cue: RundownCue | undefined; going: boolean }) {
+  if (!runReady) return "Start or resume the live session before taking a cue.";
+  if (unresolvedOutbox.length) return `${unresolvedOutbox.length} durable delivery issue${unresolvedOutbox.length === 1 ? " is" : "s are"} unresolved. Resolve it before taking another live cue.`;
+  if (!cue) return "No enabled cue remains in this rundown.";
+  if (!cue.enabled) return "This cue is disabled in the saved rundown.";
+  if (cue.status === "active") return "This cue is already being delivered.";
+  if (cue.status === "cancelled") return "This cue is cancelled.";
+  if (going) return "Live cue dispatch is in progress.";
+  return "";
+}
 
-  if (!runWorkspace.runReady) {
-    return (
-      <section className="section run-entry" aria-labelledby="run-entry-title">
-        <h2 id="run-entry-title">Confirm live operation</h2>
-        <p className="hint">Entering this workspace does not put the programme live. Review the current operational state, then explicitly start or resume the live session.</p>
-        <dl className="run-entry__summary">
-          <div><dt>Production</dt><dd>{selectedProduction?.title ?? "Not selected"}</dd></div>
-          <div><dt>Rundown</dt><dd>{rundowns.find((item) => item.id === rundownId)?.name ?? "Not selected"}</dd></div>
-          <div><dt>Cues</dt><dd>{rundown.length} total · {disabledCueCount} disabled</dd></div>
-          <div><dt>Connection</dt><dd>API {apiConnection} · Stream {streamConnection}</dd></div>
-          <div><dt>Live session</dt><dd>{sessionId ? "Existing session can be resumed" : "No active session"}</dd></div>
-          <div><dt>Dispatch issues</dt><dd>{unresolvedOutbox.length ? `${unresolvedOutbox.length} pending or failed` : "None"}</dd></div>
-        </dl>
-        {unresolvedOutbox.length > 0 && (
-          <ValidationMessage
-            type="error"
-            message="Resolve or acknowledge the listed dispatch issues before operating live. Retry and Cancel remain available below."
-          />
-        )}
-        <PrimaryAction
-          className="run-entry__go"
-          disabled={!rundownId || apiConnection !== "connected" || streamConnection !== "connected"}
-          onClick={runWorkspace.enterRun}
-        >
-          {sessionId ? "Resume live session" : "Start live session"}
-        </PrimaryAction>
-      </section>
-    );
-  }
+export async function executeLiveCue(cue: RundownCue, goCue: (cue: RundownCue) => Promise<unknown>) {
+  return goCue(cue);
+}
 
-  const left = (
-    <WorkspacePanel heading="Cue stack">
-      <CueList heading="Complete rundown" ariaLabel="Live cue stack">
-        {rundown.map((cue, index) => (
-          <CueListItem
-            key={cue.id}
-            order={cue.order}
-            label={cue.label}
-            status={cue.status}
-            enabled={cue.enabled}
-            active={index === runWorkspace.runCueIndex}
-            onSelect={() => runWorkspace.setRunCueIndex(index)}
-            disabled={!cue.enabled}
-          />
-        ))}
-      </CueList>
-    </WorkspacePanel>
-  );
+function cueContext(rundown: RundownCue[], index: number) {
+  return {
+    previous: index > 0 ? rundown[index - 1] : undefined,
+    current: rundown[index],
+    next: rundown.slice(index + 1).find((cue) => cue.enabled && cue.status !== "complete"),
+  };
+}
 
-  const centre = (
-    <WorkspacePanel heading="Programme preview" variant="run">
-      <div style={{ marginBottom: 12 }}>
-        <StatusBadge status={sessionId ? "active" : "draft"} label={sessionId ? "Session active" : "No session"} />
-      </div>
-      <PlayerPreview
-        url={programmePreviewUrl}
-        title="Programme Player preview"
-        profile="desktop"
-      />
-    </WorkspacePanel>
-  );
+function commandSummary(cue: RundownCue | undefined, events: StoredEvent[]) {
+  if (!cue) return "No live cue is selected.";
+  const event = events.find((item) => item.event.id === cue.executionId);
+  return event ? `${event.event.t} · ${cue.label}` : `Saved rundown cue · ${cue.label}`;
+}
 
-  const right = (
-    <WorkspacePanel heading="Live control" variant="run">
-      {unresolvedOutbox.length > 0 && (
-        <ValidationMessage
-          type="error"
-          message={`${unresolvedOutbox.length} pending or failed durable command${unresolvedOutbox.length === 1 ? "" : "s"} must be resolved before later live cues can be sent.`}
-        />
-      )}
+export function RunContextPanel({ rundowns, rundownId, rundown, selectedProduction, disabledCueCount, apiConnection, streamConnection, sessionId, unresolvedOutbox, runWorkspace }: Pick<RunShellProps, "rundowns" | "rundownId" | "rundown" | "selectedProduction" | "disabledCueCount" | "apiConnection" | "streamConnection" | "sessionId" | "unresolvedOutbox" | "runWorkspace">) {
+  const rundownName = rundowns.find((item) => item.id === rundownId)?.name ?? "Not selected";
+  return <section className="run-context-panel" aria-label="Live operation context">
+    <div className="run-panel-heading"><span>Live operation</span><h2>{runWorkspace.runReady ? "Session active" : "Entry readiness"}</h2></div>
+    <dl>
+      <div><dt>Production</dt><dd>{selectedProduction?.title ?? "Not selected"}</dd></div>
+      <div><dt>Rundown</dt><dd>{rundownName}</dd></div>
+      <div><dt>Session</dt><dd>{sessionId || "No active session"}</dd></div>
+      <div><dt>Cues</dt><dd>{rundown.length} total · {disabledCueCount} disabled</dd></div>
+      <div><dt>API</dt><dd>{apiConnection}</dd></div>
+      <div><dt>Stream</dt><dd>{streamConnection}</dd></div>
+    </dl>
+    {unresolvedOutbox.length > 0 && <p className="run-context-panel__warning">{unresolvedOutbox.length} durable delivery issue{unresolvedOutbox.length === 1 ? "" : "s"} need resolution.</p>}
+    {!runWorkspace.runReady && <p className="hint">Review the live state, then start or resume the session from the operational panel. This does not take a cue.</p>}
+  </section>;
+}
 
-      <div style={{ marginTop: 14 }}>
-        <h3 style={{ color: "#e69494", fontSize: ".72rem", fontWeight: 750, letterSpacing: ".08em", textTransform: "uppercase" }}>
-          Current cue
-        </h3>
-        <p style={{ color: "#fff", fontSize: "1.25rem", fontWeight: 750, marginTop: 4 }}>
-          {runWorkspace.runCue?.label ?? "No enabled cue remaining"}
-        </p>
-        <p style={{ color: "#bdc6d4", fontSize: ".86rem", marginTop: 2 }}>
-          {runWorkspace.runCue
-            ? `${runWorkspace.runCue.order}. ${runWorkspace.runCue.status}`
-            : "The rundown is complete or has no enabled cues."}
-        </p>
-      </div>
+export function RunProgrammeStage({ sessionId, rundown, events, outbox, programmePreviewUrl, runWorkspace }: Pick<RunShellProps, "sessionId" | "rundown" | "events" | "outbox" | "programmePreviewUrl" | "runWorkspace">) {
+  const { current } = cueContext(rundown, runWorkspace.runCueIndex);
+  const latestDelivery = [...outbox].sort((a, b) => b.revision - a.revision)[0];
+  const currentContext = current ? `${current.order}. ${current.label}` : "Waiting for a live cue";
+  return <section className="run-programme-stage" aria-label="Fitted live programme preview">
+    <div className="run-stage__live"><StatusBadge status="live" label="LIVE" /><span>{sessionId ? "Live execution session active" : "Live session not started"}</span></div>
+    <div className="run-stage__heading"><div><span>Programme preview</span><h1>{currentContext}</h1></div><span>{latestDelivery ? `Revision ${latestDelivery.revision} · ${latestDelivery.status}` : "No delivered revision"}</span></div>
+    <div className="run-stage__canvas">
+      <div className="run-stage__header">Header</div><div className="run-stage__rail">Left rail</div>
+      <div className="run-stage__video"><span>16:9 live programme monitor</span><strong>{commandSummary(current, events)}</strong><small>{sessionId ? "Presentation state follows the active live session." : "Start or resume a live session to operate this output."}</small></div>
+      <div className="run-stage__rail">Right rail</div><div className="run-stage__footer">Footer</div>
+    </div>
+    <div className="run-stage__footerbar"><span>Fitted live-state preview — command dispatch is available only in the cue-control panel.</span>{programmePreviewUrl ? <a href={programmePreviewUrl} target="_blank" rel="noreferrer">Open real output</a> : <span>Choose a channel to open real output.</span>}</div>
+  </section>;
+}
 
-      {runWorkspace.nextRunCue && (
-        <div style={{ marginTop: 12 }}>
-          <span style={{ color: "#e69494", fontSize: ".72rem", fontWeight: 750, letterSpacing: ".08em", textTransform: "uppercase" }}>Next</span>
-          <p style={{ color: "#edf4ff", fontSize: ".86rem", marginTop: 4 }}>{runWorkspace.nextRunCue.label}</p>
-        </div>
-      )}
+export function RunDispatchPanel({ rundown, events, outbox, unresolvedOutbox, status, error, runWorkspace, resolveOutbox }: Pick<RunShellProps, "rundown" | "events" | "outbox" | "unresolvedOutbox" | "status" | "error" | "runWorkspace" | "resolveOutbox">) {
+  const { current } = cueContext(rundown, runWorkspace.runCueIndex);
+  const latestDelivery = [...outbox].sort((a, b) => b.revision - a.revision)[0];
+  return <section className="run-dispatch-panel" aria-label="Live dispatch and delivery recovery">
+    <div className="run-panel-heading"><span>Live delivery</span><h2>{unresolvedOutbox.length ? "Delivery needs resolution" : "Dispatch status"}</h2></div>
+    <dl className="run-dispatch-panel__summary">
+      <div><dt>Current cue</dt><dd>{current?.label ?? "No selected cue"}</dd></div>
+      <div><dt>Command</dt><dd>{commandSummary(current, events)}</dd></div>
+      <div><dt>Latest revision</dt><dd>{latestDelivery ? `${latestDelivery.revision} · ${latestDelivery.status}` : "Not dispatched"}</dd></div>
+    </dl>
+    {status && <p className="run-dispatch-panel__status" role="status">{status}</p>}
+    {error && <p className="run-dispatch-panel__error" role="alert">{error}</p>}
+    {unresolvedOutbox.length > 0 ? <div className="run-delivery-issues" role="alert"><ValidationMessage type="error" message="Later live cues are blocked until the durable delivery issue is resolved." />{unresolvedOutbox.map((item) => <article key={item.id}><div><strong>{item.label}</strong><span>Revision {item.revision} · {item.status}</span>{item.error && <small>{item.error}</small>}</div><div><SecondaryAction disabled={!item.retryable} onClick={() => resolveOutbox(item, "retry")}>Retry same command</SecondaryAction><DangerAction disabled={!item.cancellable} onClick={() => resolveOutbox(item, "cancel")}>Cancel and resolve revision</DangerAction></div></article>)}</div> : <p className="run-dispatch-panel__clear">No unresolved durable delivery. The next live cue can be taken when ready.</p>}
+  </section>;
+}
 
-      <div style={{ marginTop: 16, display: "flex", flexDirection: "column", gap: 10 }}>
-        <SecondaryAction
-          disabled={runWorkspace.runCueIndex === 0}
-          onClick={() => runWorkspace.setRunCueIndex((index) => Math.max(0, index - 1))}
-        >
-          Previous
-        </SecondaryAction>
-
-        <PrimaryAction
-          className="action-btn--go"
-          disabled={unresolvedOutbox.length > 0 || !runWorkspace.runCue || !runWorkspace.runCue.enabled || runWorkspace.runCue.status === "active" || runWorkspace.runCue.status === "cancelled"}
-          onClick={() => {
-            if (runWorkspace.runCue) runWorkspace.goCue(runWorkspace.runCue);
-          }}
-        >
-          {unresolvedOutbox.length > 0 ? "Resolve delivery issue" : runWorkspace.runCue?.status === "failed" ? "Retry cue" : "GO"}
-        </PrimaryAction>
-
-        <SafetyAction onClick={() => runWorkspace.setConfirmation("safe-clear")}>
-          Safe Clear
-        </SafetyAction>
-      </div>
-
-      <div style={{ marginTop: 16, borderTop: "1px solid #4c2930", paddingTop: 14, display: "flex", flexDirection: "column", gap: 8 }}>
-        <SecondaryAction onClick={() => runWorkspace.setConfirmation("complete")}>
-          Complete show
-        </SecondaryAction>
-        <DangerAction onClick={() => runWorkspace.setConfirmation("abandon")}>
-          Abandon session
-        </DangerAction>
-        <SecondaryAction onClick={() => runWorkspace.setConfirmation("reset")}>
-          Reset live session
-        </SecondaryAction>
-      </div>
-    </WorkspacePanel>
-  );
-
-  return <ThreeColumnWorkspace left={left} centre={centre} right={right} wideCentre />;
+export function RunOperationsPanel({ rundownId, rundown, unresolvedOutbox, runWorkspace }: Pick<RunShellProps, "rundownId" | "rundown" | "unresolvedOutbox" | "runWorkspace">) {
+  const { previous, current, next } = cueContext(rundown, runWorkspace.runCueIndex);
+  const reason = liveGoDisabledReason({ runReady: runWorkspace.runReady, unresolvedOutbox, cue: runWorkspace.runCue, going: runWorkspace.going });
+  return <section className="run-operations-panel" aria-label="Live cue stack and controls">
+    <div className="run-panel-heading"><span>Live output</span><h2>Cue stack</h2></div>
+    <div className="run-operations-panel__context"><span>Previous: {previous ? `${previous.order}. ${previous.label}` : "—"}</span><strong>Current: {current ? `${current.order}. ${current.label}` : "—"}</strong><span>Next: {next ? `${next.order}. ${next.label}` : "—"}</span></div>
+    <CueList ariaLabel="Live cue stack">{rundown.map((cue, index) => <CueListItem key={cue.id} order={cue.order} label={cue.label} status={cue.status} enabled={cue.enabled} active={index === runWorkspace.runCueIndex} onSelect={() => runWorkspace.setRunCueIndex(index)} />)}</CueList>
+    {!runWorkspace.runReady ? <PrimaryAction className="run-entry__go" disabled={!rundownId} onClick={runWorkspace.enterRun}>{"Start live session"}</PrimaryAction> : <><PrimaryAction className="action-btn--go" disabled={Boolean(reason)} onClick={() => { if (runWorkspace.runCue) void executeLiveCue(runWorkspace.runCue, runWorkspace.goCue); }}>GO</PrimaryAction>{reason && <p className="run-operations-panel__reason">{reason}</p>}<SafetyAction onClick={() => runWorkspace.setConfirmation("safe-clear")}>Safe Clear</SafetyAction><div className="run-operations-panel__safety"><SecondaryAction onClick={() => runWorkspace.setConfirmation("complete")}>Complete show</SecondaryAction><DangerAction onClick={() => runWorkspace.setConfirmation("abandon")}>Abandon session</DangerAction><SecondaryAction onClick={() => runWorkspace.setConfirmation("reset")}>Reset live session</SecondaryAction></div></>}
+  </section>;
 }
 
 export function ConfirmationDialog({ runWorkspace }: { runWorkspace: ReturnType<typeof useRunWorkspace> }) {

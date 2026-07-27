@@ -9,7 +9,7 @@ import { RundownCueEditor, RundownCueStackPanel, RundownElementsPanel, RundownPr
 import { ViewerPlacementEditor, ViewerProgrammeStage, ViewerSelectionPanel, ViewerStatusPanel } from "./components/ViewerWorkspace.js";
 import { ShowConfigurationWorkspace } from "./components/ShowConfigurationWorkspace.js";
 import { RehearsalContextPanel, RehearsalCueStackPanel, RehearsalProgrammeStage, RehearsalResultPanel, useRehearsalWorkspace } from "./components/RehearseWorkspace.js";
-import { RunWorkspaceSection, ConfirmationDialog } from "./components/RunWorkspaceSection.js";
+import { ConfirmationDialog, RunContextPanel, RunDispatchPanel, RunOperationsPanel, RunProgrammeStage } from "./components/RunWorkspaceSection.js";
 import { DiagnosticsPanel } from "./components/DiagnosticsPanel.js";
 import { LegacyOverlay } from "./components/LegacyOverlay.js";
 import type { OutboxItem, RundownCue } from "./types.js";
@@ -132,7 +132,7 @@ export default function App() {
   const productionSwitchLocked = workspace === "run" && runWorkspace.runReady;
   const playerPreviewUrl = channelId ? `${window.location.protocol}//${window.location.hostname}:3003/player/${encodeURIComponent(channelId)}?profile=${previewProfile}&rehearsal=1&embedded=1&productionId=${encodeURIComponent(productionId)}` : "";
   const layoutPreviewUrl = channelId ? `${window.location.protocol}//${window.location.hostname}:3003/player/${encodeURIComponent(channelId)}?scene=acceptance&profile=${previewProfile}&embedded=1&productionId=${encodeURIComponent(productionId)}` : "";
-  const programmePreviewUrl = channelId ? `${window.location.protocol}//${window.location.hostname}:3003/player/${encodeURIComponent(channelId)}?profile=desktop&embedded=1&productionId=${encodeURIComponent(productionId)}` : "";
+  const programmePreviewUrl = channelId ? `${window.location.protocol}//${window.location.hostname}:3003/player/${encodeURIComponent(channelId)}?profile=desktop&productionId=${encodeURIComponent(productionId)}` : "";
 
   const adminState = useMemo<AdminStateValue>(() => ({
     channelId, productionId, rundownId, workspace,
@@ -160,19 +160,22 @@ export default function App() {
 
       {isRehearseWorkspace && <RehearsalProgrammeStage ui={rehearsalWorkspace} previewProfile={previewProfile} playerPreviewUrl={playerPreviewUrl} />}
 
-      {workspace === "run" && <RunWorkspaceSection rundowns={rundowns} rundown={rundown} selectedProduction={selectedProduction} disabledCueCount={disabledCueCount} apiConnection={apiConnection} streamConnection={streamConnection} sessionId={sessionId} unresolvedOutbox={unresolvedOutbox} programmePreviewUrl={programmePreviewUrl} runWorkspace={runWorkspace} setDiagnosticsOpen={setDiagnosticsOpen} />}
+      {workspace === "run" && <RunProgrammeStage sessionId={sessionId} rundown={rundown} events={events} outbox={outbox} programmePreviewUrl={programmePreviewUrl} runWorkspace={runWorkspace} />}
 
       {workspace === "prepare" && !isRundownWorkspace && !isViewerWorkspace && <LegacyOverlay title={title} setTitle={setTitle} message={message} setMessage={setMessage} duration={duration} setDuration={setDuration} />}
     </>;
 
   const rundownShellProps = { productionId, rundownId, rundowns, rundown, rundownEditor, commandBuilder, setRundownId, refreshRundowns, mutate, previewProfile, setPreviewProfile, realOutputUrl: layoutPreviewUrl, previewCue: previewRundownCue };
   const viewerShellProps = { showConfig, previewProfile, setPreviewProfile, realOutputUrl: layoutPreviewUrl, saveProduction: saveViewerProduction };
+  const runShellProps = { rundowns, rundownId, rundown, selectedProduction, disabledCueCount, apiConnection, streamConnection, sessionId, unresolvedOutbox, outbox, events, status, error, programmePreviewUrl, runWorkspace, resolveOutbox };
   const farLeft = isRundownWorkspace
     ? <RundownElementsPanel {...rundownShellProps} />
     : isViewerWorkspace
       ? <ViewerSelectionPanel {...viewerShellProps} />
-      : isRehearseWorkspace
-        ? <><AdminContext route={route} channels={channels} productions={productions} rundowns={rundowns} channelId={channelId} productionId={productionId} rundownId={rundownId} productionSwitchLocked={productionSwitchLocked} selectionError={selectionError} onChannelChange={setChannelId} onProductionChange={setProductionId} onRundownChange={setRundownId} /><RehearsalContextPanel previewProfile={previewProfile} setPreviewProfile={setPreviewProfile} sessionId={sessionId} returnToPrepare={returnToPrepare} /></>
+    : isRehearseWorkspace
+      ? <><AdminContext route={route} channels={channels} productions={productions} rundowns={rundowns} channelId={channelId} productionId={productionId} rundownId={rundownId} productionSwitchLocked={productionSwitchLocked} selectionError={selectionError} onChannelChange={setChannelId} onProductionChange={setProductionId} onRundownChange={setRundownId} /><RehearsalContextPanel previewProfile={previewProfile} setPreviewProfile={setPreviewProfile} sessionId={sessionId} returnToPrepare={returnToPrepare} /></>
+      : workspace === "run"
+        ? <RunContextPanel {...runShellProps} />
     : <AdminContext route={route} channels={channels} productions={productions} rundowns={rundowns} channelId={channelId} productionId={productionId} rundownId={rundownId} productionSwitchLocked={productionSwitchLocked} selectionError={selectionError} onChannelChange={setChannelId} onProductionChange={setProductionId} onRundownChange={setRundownId} />;
 
   const centreBottom = isRundownWorkspace
@@ -181,9 +184,11 @@ export default function App() {
       ? <ViewerPlacementEditor {...viewerShellProps} />
     : isRehearseWorkspace
       ? <RehearsalResultPanel ui={rehearsalWorkspace} rundownEditor={rundownEditor} sessionId={sessionId} />
+    : workspace === "run"
+      ? <RunDispatchPanel {...runShellProps} />
     : <section className="shell-context-panel" aria-label="Workspace context">
       <strong>{route.workspace === "productions" ? "Production library" : `${workspace} workspace`}</strong>
-      <span>{workspace === "run" ? "Live controls remain in the active Run workspace." : "Select and operate within the active workspace above."}</span>
+      <span>Select and operate within the active workspace above.</span>
     </section>;
 
   const farRight = isRundownWorkspace
@@ -192,10 +197,12 @@ export default function App() {
       ? <ViewerStatusPanel {...viewerShellProps} />
     : isRehearseWorkspace
       ? <RehearsalCueStackPanel ui={rehearsalWorkspace} rundown={rundown} rundownId={rundownId} returnToPrepare={returnToPrepare} />
+    : workspace === "run"
+      ? <RunOperationsPanel {...runShellProps} />
     : diagnosticsOpen
     ? <DiagnosticsPanel workspace={workspace} events={events} outbox={outbox} resolveOutbox={resolveOutbox} />
     : <section className="shell-operations-panel" aria-label="Operational status">
-        <strong>{workspace === "run" ? "Live operation" : "Workspace status"}</strong>
+        <strong>Workspace status</strong>
         <span>{sessionId ? `Session ${sessionId}` : "No active execution session"}</span>
         <span>{unresolvedOutbox.length ? `${unresolvedOutbox.length} delivery issue${unresolvedOutbox.length === 1 ? "" : "s"}` : "No unresolved delivery issues"}</span>
         <button type="button" onClick={() => setDiagnosticsOpen(true)}>Open diagnostics</button>
@@ -211,7 +218,7 @@ export default function App() {
 
   return <AdminStateContext.Provider value={adminState}>
     <AdminShell
-      className={isViewerWorkspace ? "admin-shell--viewer" : ""}
+      className={isViewerWorkspace ? "admin-shell--viewer" : workspace === "run" ? "admin-shell--run" : ""}
       topBar={<TopBar apiConnection={apiConnection} streamConnection={streamConnection} workspace={route.workspace} productionId={productionId} selectedProduction={selectedProduction} diagnosticsOpen={diagnosticsOpen} onToggleDiagnostics={() => setDiagnosticsOpen((open) => !open)} onNavigateHome={() => navigate({ workspace: "productions" })} onNavigate={navigate} />}
       farLeft={farLeft}
       centreTop={primaryWorkspace}

@@ -17,6 +17,7 @@ interface Params {
 export function useRunWorkspace({ rundownId, rundown, sessionId, rehearsal, send, mutate, fetchRundown, fetchEvents, fetchOutbox, workspace }: Params) {
   const [runReady, setRunReady] = useState(false);
   const [runCueIndex, setRunCueIndex] = useState(0);
+  const [going, setGoing] = useState(false);
   const [confirmation, setConfirmation] = useState<"complete" | "abandon" | "reset" | "safe-clear" | null>(null);
   const confirmationButton = useRef<HTMLButtonElement>(null);
 
@@ -31,6 +32,8 @@ export function useRunWorkspace({ rundownId, rundown, sessionId, rehearsal, send
   }, [rundown]);
 
   const goCue = useCallback(async (cue: RundownCue, rerun = false) => {
+    if (going) return { error: "Live cue dispatch is already in progress." };
+    setGoing(true);
     try {
       const response = await fetch(`/api/rundown/${rehearsal ? "rehearsal" : "live"}/go?rundownId=${encodeURIComponent(rundownId)}`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ cueId: cue.id, ...(rerun ? { rerun: true } : {}) }) });
       if (!response.ok) throw new Error(await response.text());
@@ -39,7 +42,8 @@ export function useRunWorkspace({ rundownId, rundown, sessionId, rehearsal, send
       if (!rehearsal) { fetchEvents(); fetchOutbox(); }
       return { success: `${rehearsal ? "Rehearsal" : "Live"} rundown: ${cue.label} ${result.dispatchStatus ?? "complete"}` };
     } catch (reason) { return { error: reason instanceof Error ? reason.message : "Unable to execute cue" }; }
-  }, [rehearsal, rundownId, fetchRundown, fetchEvents, fetchOutbox]);
+    finally { setGoing(false); }
+  }, [going, rehearsal, rundownId, fetchRundown, fetchEvents, fetchOutbox]);
 
   const enterRun = useCallback(async () => {
     if (sessionId) { setRunReady(true); return { status: "Resumed the existing live session." }; }
@@ -74,6 +78,7 @@ export function useRunWorkspace({ rundownId, rundown, sessionId, rehearsal, send
 
   return {
     runReady, setRunReady,
+    going,
     runCueIndex, setRunCueIndex,
     confirmation, setConfirmation,
     confirmationButton,
