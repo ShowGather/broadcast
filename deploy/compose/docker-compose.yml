@@ -72,7 +72,7 @@ services:
   admin:
     build:
       context: ../..
-      dockerfile: deploy/compose/Dockerfile.admin-next
+      dockerfile: deploy/compose/Dockerfile.admin
     ports:
       - "3002:3002"
     environment:

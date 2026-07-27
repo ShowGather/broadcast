@@ -61,11 +61,31 @@ export function useAdminSelectors({ route, navigate }: Params) {
     if (response.ok) setRundowns(await response.json() as Rundown[]);
   }, [productionId]);
 
+  const selectChannel = useCallback((nextChannelId: string) => {
+    if (nextChannelId === channelId) return;
+
+    // Clear dependent selections before fetching the new channel's catalogue.
+    // This prevents a production or rundown from the previous channel being
+    // presented as active while the replacement list is loading.
+    setChannelId(nextChannelId);
+    setProductionId("");
+    setRundownId("");
+    setProductions([]);
+    setRundowns([]);
+    setSelectionError("");
+    localStorage.removeItem("showgather.productionId");
+    localStorage.removeItem("showgather.rundownId");
+
+    if (route.workspace !== "productions") {
+      navigate({ workspace: "productions" });
+    }
+  }, [channelId, navigate, route.workspace]);
+
   const selectedProduction = productions.find((p) => p.id === productionId);
 
   return {
     channels, productions, rundowns,
-    channelId, setChannelId,
+    channelId, setChannelId: selectChannel,
     productionId, setProductionId,
     rundownId, setRundownId,
     selectionError, setSelectionError,

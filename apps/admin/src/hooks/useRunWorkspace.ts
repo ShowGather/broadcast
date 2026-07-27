@@ -50,19 +50,23 @@ export function useRunWorkspace({ rundownId, rundown, sessionId, rehearsal, send
 
   const confirmSessionAction = useCallback(async () => {
     if (!confirmation) return;
-    if (confirmation === "safe-clear") {
-      await send({ action: "safe-clear" }, "Safe Clear sent");
-    } else if (confirmation === "reset") {
-      const result = await mutate(`/api/rundown/live/sessions?rundownId=${encodeURIComponent(rundownId)}`, "POST", {}, "New live session started", fetchRundown);
-      if (result) setRunReady(true);
-    } else if (sessionId) {
-      const response = await fetch(`/api/rundown/live/sessions/${encodeURIComponent(sessionId)}/${confirmation}?rundownId=${encodeURIComponent(rundownId)}`, { method: "POST" });
-      if (!response.ok) { return { error: await response.text() }; }
-      setRunReady(false); await fetchRundown();
-      return { status: confirmation === "complete" ? "Live session completed." : "Live session abandoned." };
+    try {
+      if (confirmation === "safe-clear") {
+        await send({ action: "safe-clear" }, "Safe Clear sent");
+      } else if (confirmation === "reset") {
+        const result = await mutate(`/api/rundown/live/sessions?rundownId=${encodeURIComponent(rundownId)}`, "POST", {}, "New live session started", fetchRundown);
+        if (result) setRunReady(true);
+      } else if (sessionId) {
+        const response = await fetch(`/api/rundown/live/sessions/${encodeURIComponent(sessionId)}/${confirmation}?rundownId=${encodeURIComponent(rundownId)}`, { method: "POST" });
+        if (!response.ok) return { error: await response.text() };
+        setRunReady(false);
+        await fetchRundown();
+        return { status: confirmation === "complete" ? "Live session completed." : "Live session abandoned." };
+      }
+      return undefined;
+    } finally {
+      setConfirmation(null);
     }
-    setConfirmation(null);
-    return undefined;
   }, [confirmation, send, mutate, rundownId, fetchRundown, sessionId]);
 
   const runCue = rundown[runCueIndex];

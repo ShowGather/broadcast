@@ -114,7 +114,7 @@ export default function App() {
 
 return <AdminStateContext.Provider value={adminState}>
     <AdminShell>
-      {route.workspace === "productions" && <ProductionsHome channels={channels} productions={productions} rundowns={rundowns} setProductionId={setProductionId} createProduction={createProduction} refreshProductions={refreshProductions} />}
+      {route.workspace === "productions" && <ProductionsHome channels={channels} productions={productions} rundowns={rundowns} setChannelId={setChannelId} setProductionId={setProductionId} createProduction={createProduction} refreshProductions={refreshProductions} />}
 
       {!isProductionsHome && workspace === "prepare" && prepareTab === "overview" && (
         <PrepareOverview showConfig={showConfig} rundownEditor={rundownEditor} selectedProduction={selectedProduction} disabledCueCount={disabledCueCount} createProduction={() => createProduction()} duplicateProduction={duplicateProduction} onNavigate={navigatePrepareTab} />
@@ -135,6 +135,8 @@ return <AdminStateContext.Provider value={adminState}>
       {workspace === "rehearse" && <RehearseWorkspace playerPreviewUrl={playerPreviewUrl} previewProfile={previewProfile} setPreviewProfile={setPreviewProfile} rundowns={rundowns} rundown={rundown} rehearsal={rehearsal} runWorkspace={runWorkspace} fetchRundown={fetchRundown} />}
 
       {workspace === "run" && <RunWorkspaceSection rundowns={rundowns} rundown={rundown} selectedProduction={selectedProduction} disabledCueCount={disabledCueCount} apiConnection={apiConnection} streamConnection={streamConnection} sessionId={sessionId} unresolvedOutbox={unresolvedOutbox} programmePreviewUrl={programmePreviewUrl} runWorkspace={runWorkspace} setDiagnosticsOpen={setDiagnosticsOpen} />}
+
+      <ConfirmationDialog runWorkspace={runWorkspace} />
 
       {workspace === "prepare" && <LegacyOverlay title={title} setTitle={setTitle} message={message} setMessage={setMessage} duration={duration} setDuration={setDuration} />}
 

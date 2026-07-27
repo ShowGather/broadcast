@@ -11,12 +11,13 @@ interface Props {
   channels: Channel[];
   productions: Production[];
   rundowns: Rundown[];
+  setChannelId: (id: string) => void;
   setProductionId: (id: string) => void;
   createProduction: (fresh?: boolean) => Promise<void>;
   refreshProductions: () => Promise<void>;
 }
 
-export function ProductionsHome({ channels, productions, rundowns, setProductionId, createProduction, refreshProductions }: Props) {
+export function ProductionsHome({ channels, productions, rundowns, setChannelId, setProductionId, createProduction, refreshProductions }: Props) {
   const { productionId, channelId, navigate, mutate } = useAdminState();
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [statusFilter, setStatusFilter] = useState<string>("all");
@@ -50,7 +51,7 @@ export function ProductionsHome({ channels, productions, rundowns, setProduction
       <div className="form">
         <label>
           <span>Channel</span>
-          <select value={channelId} onChange={(e) => {}}>
+          <select value={channelId} onChange={(event) => setChannelId(event.target.value)}>
             {channels.map((channel) => (
               <option key={channel.id} value={channel.id}>{channel.name}</option>
             ))}
