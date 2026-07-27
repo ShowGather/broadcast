@@ -11,6 +11,7 @@ interface Params {
 export function useRundownEditor({ rundownId, mutate, fetchRundown, currentCommand }: Params) {
   const [rundownName, setRundownName] = useState("");
   const [rundownDefinition, setRundownDefinition] = useState<RundownDefinitionCue[]>([]);
+  const [selectedCueId, setSelectedCueId] = useState<string | null>(null);
 
   const reloadRundownDefinition = useCallback(async () => {
     if (!rundownId) return;
@@ -18,13 +19,26 @@ export function useRundownEditor({ rundownId, mutate, fetchRundown, currentComma
     if (!response.ok) throw new Error("Unable to load rundown editor");
     const item = await response.json() as { name: string; cues: RundownDefinitionCue[] };
     setRundownName(item.name); setRundownDefinition(item.cues);
+    setSelectedCueId((current) => item.cues.some((cue) => cue.id === current) ? current : null);
   }, [rundownId]);
 
   useEffect(() => { reloadRundownDefinition().catch(() => {}); }, [reloadRundownDefinition]);
+  useEffect(() => { setSelectedCueId(null); }, [rundownId]);
 
   const addCue = useCallback(async () => {
     await mutate(`/api/rundowns/${rundownId}/cues`, "POST", { label: currentCommand().l || `${currentCommand().k} cue`, command: currentCommand(), enabled: true }, "Cue saved", async () => { await reloadRundownDefinition(); await fetchRundown(); });
   }, [rundownId, mutate, currentCommand, reloadRundownDefinition, fetchRundown]);
+
+  const duplicateCue = useCallback(async (cue: RundownDefinitionCue) => {
+    const result = await mutate(
+      `/api/rundowns/${rundownId}/cues`,
+      "POST",
+      { label: `${cue.label} (Copy)`, command: cue.commandPayload, enabled: cue.enabled },
+      "Cue duplicated",
+      async () => { await reloadRundownDefinition(); await fetchRundown(); }
+    );
+    if (result?.id) setSelectedCueId(result.id);
+  }, [rundownId, mutate, reloadRundownDefinition, fetchRundown]);
 
   const editCue = useCallback(async (cue: RundownDefinitionCue, changes: Record<string, unknown>) => {
     await mutate(`/api/rundown-cues/${cue.id}`, "PUT", changes, "Cue updated", async () => { await reloadRundownDefinition(); await fetchRundown(); });
@@ -39,8 +53,10 @@ export function useRundownEditor({ rundownId, mutate, fetchRundown, currentComma
   return {
     rundownName, setRundownName,
     rundownDefinition,
+    selectedCueId, setSelectedCueId,
     reloadRundownDefinition,
     addCue,
+    duplicateCue,
     editCue,
     moveCue,
   } as const;

@@ -5,7 +5,7 @@ import { AdminContext } from "./components/AdminContext.js";
 import { AdminStateContext, type AdminStateValue } from "./components/AdminStateContext.js";
 import { ProductionsHome } from "./components/ProductionsHome.js";
 import { PrepareOverview } from "./components/PrepareOverview.js";
-import { RundownWorkspace } from "./components/RundownWorkspace.js";
+import { RundownCueEditor, RundownCueStackPanel, RundownElementsPanel, RundownProgrammeStage } from "./components/RundownWorkspace.js";
 import { ViewerWorkspace } from "./components/ViewerWorkspace.js";
 import { ShowConfigurationWorkspace } from "./components/ShowConfigurationWorkspace.js";
 import { RehearseWorkspace } from "./components/RehearseWorkspace.js";
@@ -34,6 +34,7 @@ export default function App() {
   const workspace = isProductionsHome ? "prepare" : route.workspace;
   const prepareTab = route.prepareTab ?? "overview";
   const rehearsal = workspace === "rehearse";
+  const isRundownWorkspace = !isProductionsHome && workspace === "prepare" && prepareTab === "rundown";
 
   const navigate = useCallback((next: AdminRoute, replace = false) => {
     const path = adminPath(next);
@@ -75,6 +76,21 @@ export default function App() {
   });
 
   const runWorkspace = useRunWorkspace({ rundownId, rundown, sessionId, rehearsal, send, mutate, fetchRundown, fetchEvents, fetchOutbox, workspace });
+
+  const previewRundownCue = useCallback(async (cue: RundownCue) => {
+    setError(""); setStatus("");
+    try {
+      const response = await fetch(`/api/rundown/rehearsal/go?rundownId=${encodeURIComponent(rundownId)}`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ cueId: cue.id }),
+      });
+      if (!response.ok) throw new Error(await response.text());
+      setStatus(`Rehearsal preview: ${cue.label}`);
+    } catch (reason) {
+      setError(reason instanceof Error ? reason.message : "Unable to preview cue in rehearsal");
+    }
+  }, [rundownId, setError, setStatus]);
 
   const sendCommand = () => send({ command: commandBuilder.currentCommand() }, `${commandBuilder.commandKind} command sent`);
 
@@ -120,9 +136,7 @@ export default function App() {
         <PrepareOverview showConfig={showConfig} rundownEditor={rundownEditor} selectedProduction={selectedProduction} disabledCueCount={disabledCueCount} createProduction={() => createProduction()} duplicateProduction={duplicateProduction} onNavigate={navigatePrepareTab} />
       )}
 
-      {!isProductionsHome && workspace === "prepare" && prepareTab === "rundown" && (
-        <RundownWorkspace rundownEditor={rundownEditor} commandBuilder={commandBuilder} setRundownId={setRundownId} refreshRundowns={refreshRundowns} previewProfile={previewProfile} setPreviewProfile={setPreviewProfile} layoutPreviewUrl={layoutPreviewUrl} />
-      )}
+      {isRundownWorkspace && <RundownProgrammeStage rundownEditor={rundownEditor} previewProfile={previewProfile} setPreviewProfile={setPreviewProfile} realOutputUrl={layoutPreviewUrl} />}
 
       {!isProductionsHome && workspace === "prepare" && prepareTab === "viewer" && (
         <ViewerWorkspace showConfig={showConfig} previewProfile={previewProfile} setPreviewProfile={setPreviewProfile} layoutPreviewUrl={layoutPreviewUrl} />
@@ -136,12 +150,17 @@ export default function App() {
 
       {workspace === "run" && <RunWorkspaceSection rundowns={rundowns} rundown={rundown} selectedProduction={selectedProduction} disabledCueCount={disabledCueCount} apiConnection={apiConnection} streamConnection={streamConnection} sessionId={sessionId} unresolvedOutbox={unresolvedOutbox} programmePreviewUrl={programmePreviewUrl} runWorkspace={runWorkspace} setDiagnosticsOpen={setDiagnosticsOpen} />}
 
-      {workspace === "prepare" && <LegacyOverlay title={title} setTitle={setTitle} message={message} setMessage={setMessage} duration={duration} setDuration={setDuration} />}
+      {workspace === "prepare" && !isRundownWorkspace && <LegacyOverlay title={title} setTitle={setTitle} message={message} setMessage={setMessage} duration={duration} setDuration={setDuration} />}
     </>;
 
-  const farLeft = <AdminContext route={route} channels={channels} productions={productions} rundowns={rundowns} channelId={channelId} productionId={productionId} rundownId={rundownId} productionSwitchLocked={productionSwitchLocked} selectionError={selectionError} onChannelChange={setChannelId} onProductionChange={setProductionId} onRundownChange={setRundownId} />;
+  const rundownShellProps = { productionId, rundownId, rundowns, rundown, rundownEditor, commandBuilder, setRundownId, refreshRundowns, mutate, previewProfile, setPreviewProfile, realOutputUrl: layoutPreviewUrl, previewCue: previewRundownCue };
+  const farLeft = isRundownWorkspace
+    ? <RundownElementsPanel {...rundownShellProps} />
+    : <AdminContext route={route} channels={channels} productions={productions} rundowns={rundowns} channelId={channelId} productionId={productionId} rundownId={rundownId} productionSwitchLocked={productionSwitchLocked} selectionError={selectionError} onChannelChange={setChannelId} onProductionChange={setProductionId} onRundownChange={setRundownId} />;
 
-  const centreBottom = <>
+  const centreBottom = isRundownWorkspace
+    ? <RundownCueEditor rundownEditor={rundownEditor} commandBuilder={commandBuilder} />
+    : <>
     {workspace === "rehearse" && <section className="rehearsal-banner" role="status">
       <strong>REHEARSAL OUTPUT ONLY</strong>
       <span>Changes are visible only in opted-in rehearsal Players. Live presentation state will not change.</span>
@@ -152,7 +171,9 @@ export default function App() {
     </section>
   </>;
 
-  const farRight = diagnosticsOpen
+  const farRight = isRundownWorkspace
+    ? <RundownCueStackPanel rundownEditor={rundownEditor} commandBuilder={commandBuilder} rundown={rundown} previewCue={previewRundownCue} />
+    : diagnosticsOpen
     ? <DiagnosticsPanel workspace={workspace} events={events} outbox={outbox} resolveOutbox={resolveOutbox} />
     : <section className="shell-operations-panel" aria-label="Operational status">
         <strong>{workspace === "run" ? "Live operation" : workspace === "rehearse" ? "Rehearsal output" : "Workspace status"}</strong>

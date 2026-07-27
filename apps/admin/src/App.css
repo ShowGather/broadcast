@@ -134,6 +134,38 @@ body {
 .admin-shell__status-bar { display: flex; align-items: center; flex-wrap: wrap; gap: 8px 16px; padding: 9px 13px; color: #9fb0c5; font-size: .75rem; }.admin-shell__status-bar .status-msg,
 .admin-shell__status-bar .error-msg { margin: 0; }
 
+/* Prepare → Rundown uses the permanent shell directly: elements in the far
+   left, the fitted programme stage above its selected-cue editor, and the
+   persisted cue stack in the far right. */
+.rundown-elements-panel, .rundown-cue-stack { display: grid; align-content: start; gap: 11px; }
+.rundown-panel-heading > span, .rundown-stage__heading span, .rundown-editor__heading span { color: #91a6c0; font-size: .7rem; font-weight: 800; letter-spacing: .09em; text-transform: uppercase; }
+.rundown-panel-heading h2 { margin-top: 3px; color: #edf6ff; font-size: 1rem; }
+.rundown-compact-field { display: grid; gap: 5px; color: #aab9ca; font-size: .76rem; }
+.rundown-compact-field select, .rundown-compact-field input, .rundown-compact-actions input { width: 100%; border: 1px solid #3c4b5f; border-radius: 5px; padding: 8px; background: #0d1521; color: #edf5ff; }
+.rundown-compact-actions { display: grid; gap: 7px; padding: 10px 0; border-top: 1px solid #293849; border-bottom: 1px solid #293849; }
+.rundown-compact-actions .action-btn, .rundown-add-cue .action-btn { justify-content: center; width: 100%; }
+.rundown-element-library { display: grid; gap: 6px; }
+.rundown-element-library h3 { color: #aebcd0; font-size: .75rem; letter-spacing: .06em; text-transform: uppercase; }
+.rundown-element-library button { display: grid; gap: 2px; width: 100%; border: 1px solid #344b68; border-radius: 6px; padding: 8px; background: #101a28; color: #e4f1ff; cursor: pointer; text-align: left; }
+.rundown-element-library button:hover, .rundown-element-library button.active { border-color: #6398c9; background: #1a314b; }
+.rundown-element-library button strong { font-size: .78rem; }.rundown-element-library button span, .rundown-add-cue p { color: #8fa2bb; font-size: .7rem; line-height: 1.35; }
+.rundown-add-cue { display: grid; gap: 8px; padding-top: 10px; border-top: 1px solid #293849; }
+
+.rundown-programme-stage { display: grid; min-height: 0; height: 100%; grid-template-rows: auto minmax(0, 1fr) auto; gap: 10px; padding: 13px; border: 1px solid #36526f; border-radius: 10px; background: #101a27; }
+.rundown-stage__heading { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; }.rundown-stage__heading h1 { margin-top: 3px; color: #eff7ff; font-size: 1.05rem; line-height: 1.2; }
+.rundown-stage__canvas { display: grid; min-height: 250px; grid-template-columns: minmax(55px, .22fr) minmax(0, 1fr) minmax(55px, .22fr); grid-template-rows: 28px minmax(0, 1fr) 28px; gap: 5px; padding: 7px; border: 1px solid #3c5878; border-radius: 7px; background: #0a121e; overflow: hidden; }
+.rundown-stage__header, .rundown-stage__footer { grid-column: 1 / -1; display: grid; place-items: center; border: 1px solid #2c4664; border-radius: 3px; background: #121f30; color: #91a8c0; font-size: .66rem; text-transform: uppercase; letter-spacing: .08em; }
+.rundown-stage__rail { display: grid; place-items: center; border: 1px solid #293f58; border-radius: 3px; background: #101b2a; color: #7f94ac; font-size: .65rem; text-align: center; text-transform: uppercase; writing-mode: vertical-rl; }
+.rundown-stage__video { display: flex; align-items: center; justify-content: center; flex-direction: column; gap: 8px; width: min(100%, calc((100vh - 270px) * 1.777)); max-height: 100%; min-height: 0; justify-self: center; align-self: center; aspect-ratio: 16 / 9; border: 1px solid #567b9f; border-radius: 4px; background: radial-gradient(circle at 50% 35%, #23425f, #0b1421 70%); color: #b8cce0; text-align: center; }
+.rundown-stage__video span { color: #95a9bf; font-size: .68rem; text-transform: uppercase; letter-spacing: .09em; }.rundown-stage__video strong { max-width: 80%; color: #f1f8ff; font-size: clamp(.8rem, 1.5vw, 1.2rem); }.rundown-stage__canvas--mobile { max-width: 560px; margin: 0 auto; }.rundown-stage__canvas--tv { border-color: #637c98; }
+.rundown-stage__footerbar { display: flex; align-items: center; justify-content: space-between; gap: 10px; color: #8fa2ba; font-size: .72rem; }.rundown-stage__footerbar a { color: #9ed8ff; font-weight: 700; text-decoration: none; white-space: nowrap; }
+
+.rundown-cue-editor { display: grid; gap: 12px; padding: 13px; }.rundown-cue-editor--empty { min-height: 110px; align-content: center; color: #9dacbf; }.rundown-cue-editor--empty strong { color: #dfeaf7; }.rundown-cue-editor--empty span { margin-top: 5px; font-size: .8rem; }
+.rundown-editor__heading { display: flex; align-items: flex-start; justify-content: space-between; gap: 10px; }.rundown-editor__heading h2 { margin-top: 3px; color: #edf6ff; font-size: 1rem; }.cue-state { border: 1px solid #4f6278; border-radius: 999px; padding: 3px 7px; font-size: .68rem; font-weight: 800; }.cue-state--enabled { border-color: #39845f; color: #a6ebc2; }.cue-state--disabled { color: #a5afbd; }
+.rundown-cue-editor__layout { display: grid; grid-template-columns: minmax(180px, .7fr) minmax(240px, 1fr); gap: 14px; }.rundown-cue-editor .form { gap: 8px; }.rundown-cue-editor .form label { font-size: .75rem; }.rundown-cue-editor .form input, .rundown-cue-editor .form select { width: 100%; padding: 7px 8px; font-size: .83rem; }.rundown-enabled-toggle { display: flex !important; align-items: center; flex-direction: row !important; gap: 7px !important; }.rundown-enabled-toggle input { width: auto !important; }
+.rundown-editor__actions { display: flex; align-items: center; flex-wrap: wrap; gap: 7px; border-top: 1px solid #293849; padding-top: 10px; }.rundown-editor__validation { color: #8fa2ba; font-size: .72rem; }
+.rundown-cue-stack { height: 100%; }.rundown-cue-stack__context { display: grid; gap: 4px; padding: 9px; border: 1px solid #304862; border-radius: 6px; background: #0e1825; color: #94a8bf; font-size: .72rem; }.rundown-cue-stack__context strong { color: #e8f4ff; font-size: .78rem; }.rundown-cue-stack .cue-list { min-height: 0; max-height: min(45vh, 430px); overflow: auto; }.rundown-cue-stack .cue-list-item__select { padding: 8px; }.rundown-cue-stack > .action-btn { width: 100%; justify-content: center; }.rundown-cue-stack__note { color: #8fa2ba; font-size: .7rem; line-height: 1.35; }
+
 /* Existing workspace components continue to own their internal composition.
    The outer shell only keeps their minimum widths inside the centre region. */
 .admin-shell__centre-top .workspace-grid { max-width: none; }
@@ -152,9 +184,9 @@ body {
     grid-template-areas:
       "top-bar"
       "centre-top"
+      "far-right"
       "centre-bottom"
       "far-left"
-      "far-right"
       "status-bar";
     overflow: visible;
   }
@@ -164,6 +196,16 @@ body {
   .admin-top-bar { grid-template-columns: 1fr; gap: 8px; }
   .admin-top-bar__navigation { justify-content: flex-start; }
   .admin-top-bar__context { justify-content: space-between; }
+  .rundown-stage__canvas { min-height: 230px; }
+  .rundown-cue-stack .cue-list { max-height: 310px; }
+  .rundown-cue-editor__layout { grid-template-columns: 1fr; }
+}
+
+@media (max-width: 520px) {
+  .rundown-stage__heading, .rundown-stage__footerbar { align-items: flex-start; flex-direction: column; }
+  .rundown-stage__canvas { min-height: 205px; grid-template-columns: 34px minmax(0, 1fr) 34px; grid-template-rows: 23px minmax(0, 1fr) 23px; }
+  .rundown-stage__rail { font-size: .55rem; }
+  .rundown-editor__actions .action-btn { flex: 1 1 calc(50% - 7px); justify-content: center; }
 }
 
 /* Keep the existing workspace-grid and other styles below */

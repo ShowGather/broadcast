@@ -1,4 +1,6 @@
-import { useState } from "react";
+import { useCallback, useState } from "react";
+
+type StoredCommand = Record<string, unknown>;
 
 export function useCommandBuilder() {
   const [commandKind, setCommandKind] = useState("score");
@@ -7,6 +9,16 @@ export function useCommandBuilder() {
   const [label, setLabel] = useState("");
   const [commandDuration, setCommandDuration] = useState(8000);
   const [commandInstanceId, setCommandInstanceId] = useState("");
+
+  const loadCommand = useCallback((command: StoredCommand) => {
+    const kind = typeof command.k === "string" ? command.k : "score";
+    setCommandKind(["score", "lower", "alert", "sponsor", "ticker", "clock", "clear"].includes(kind) ? kind : "score");
+    setPrimary(String(command.h ?? command.t ?? command.b ?? command.g ?? ""));
+    setSecondary(String(command.a ?? command.s ?? command.m ?? command.y ?? ""));
+    setLabel(String(command.l ?? ""));
+    setCommandDuration(typeof command.d === "number" && command.d > 0 ? command.d : 8000);
+    setCommandInstanceId(typeof command.i === "string" ? command.i : "");
+  }, []);
 
   const currentCommand = () => {
     const duration = Number.isFinite(commandDuration) && commandDuration > 0 ? commandDuration : undefined;
@@ -27,6 +39,7 @@ export function useCommandBuilder() {
     label, setLabel,
     commandDuration, setCommandDuration,
     commandInstanceId, setCommandInstanceId,
+    loadCommand,
     currentCommand,
   } as const;
 }
