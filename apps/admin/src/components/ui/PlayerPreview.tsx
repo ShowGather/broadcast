@@ -23,6 +23,7 @@ export function PlayerPreview({ url, title, profile = "desktop", className = "" 
       title={title}
       src={url}
       className={`player-preview player-preview--${profile} ${className}`}
+      allowFullScreen
     />
   );
 }

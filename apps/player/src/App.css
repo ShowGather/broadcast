@@ -1,5 +1,6 @@
 * { box-sizing: border-box; }
 body { margin: 0; background: #080b12; color: #e7edf7; font-family: Inter, ui-sans-serif, system-ui, sans-serif; }
+body.player-fullscreen-active { overflow: hidden; }
 button { font: inherit; }
 .app { width: min(1440px, 100%); margin: 0 auto; padding: 18px; }
 .app--embedded { padding: 10px; }.embedded-status { margin: 0 0 8px; color: #8b9bb5; font-size: .72rem; }
@@ -9,6 +10,15 @@ button { font: inherit; }
 .profile-switcher { display: flex; gap: 4px; padding: 4px; border: 1px solid #263248; border-radius: 8px; background: #101722; }
 .profile-switcher button { border: 0; border-radius: 5px; padding: 6px 10px; color: #9daac0; background: transparent; text-transform: capitalize; cursor: pointer; font-size: .78rem; }
 .profile-switcher button.active { color: #07111c; background: var(--viewer-accent, #73e3ff); font-weight: 700; }.viewer-context__live { display: inline-block; margin-bottom: 4px; color: #07111c; background: var(--viewer-accent, #73e3ff); border-radius: 4px; padding: 3px 6px; font-size: .65rem; font-weight: 850; letter-spacing: .08em; }
+
+.player-root { display: grid; gap: 10px; background: #080b12; }
+.player-toolbar { display: flex; align-items: center; justify-content: space-between; gap: 12px; color: #8b9bb5; font-size: .76rem; text-transform: capitalize; }
+.fullscreen-toggle { border: 1px solid #263a55; border-radius: 7px; padding: 7px 10px; background: #101722; color: #e7edf7; cursor: pointer; font-size: .78rem; font-weight: 700; }
+.fullscreen-toggle:hover, .fullscreen-toggle:focus-visible { border-color: var(--viewer-accent, #73e3ff); }
+.player-root:fullscreen, .player-root:-webkit-full-screen { width: 100vw; height: 100vh; max-width: none; padding: clamp(10px, 1.5vw, 22px); overflow: auto; background: #05080e; }
+.player-root:fullscreen .viewer-shell, .player-root:-webkit-full-screen .viewer-shell { min-height: calc(100vh - 54px); align-content: center; }
+.player-root:fullscreen .viewer-shell--tv, .player-root:-webkit-full-screen .viewer-shell--tv { max-width: none; }
+.player-root:fullscreen .video-player, .player-root:-webkit-full-screen .video-player { max-height: calc(100vh - 92px); object-fit: contain; }
 
 .viewer-shell { display: grid; gap: 12px; }
 .viewer-shell__main { display: grid; grid-template-columns: minmax(0, 1fr); gap: 12px; align-items: stretch; }.viewer-shell__main.has-left { grid-template-columns: minmax(150px, .55fr) minmax(0, 2.6fr); }.viewer-shell__main.has-right { grid-template-columns: minmax(0, 2.6fr) minmax(150px, .55fr); }.viewer-shell__main.has-left.has-right { grid-template-columns: minmax(150px, .55fr) minmax(0, 2.6fr) minmax(150px, .55fr); }

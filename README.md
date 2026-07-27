@@ -2,17 +2,19 @@
 
 ShowGather synchronises cue-driven graphics and surrounding web experiences with live HLS playback using timed metadata and media presentation timestamps (PTS).
 
-This is a **V1.1 pilot release candidate built on a verified timed-metadata proof of concept**. It is demonstrable locally, not a production deployment.
+This is a **local pilot release candidate built on a verified timed-metadata proof of concept**. It is demonstrable locally, not a production deployment.
 
 ## What V1 does
 
 - Desktop surround regions, mobile companion panels, and a TV profile around a live HLS player.
-- Direct configurable presentation commands and a focused operator rundown.
+- A Vite Admin production shell with Prepare, Rehearse and Run workspaces.
+- Direct configurable presentation commands and a focused operator rundown workflow.
 - Score, lower third, alert, sponsor takeover, ticker, and regional clear commands.
 - Live ID3 transport plus a development-only rehearsal SSE path.
 - Revisioned durable snapshots for late joins/reconnects; transient graphics remain tied to media PTS.
 - Persistent channels, productions, rundowns, command history, and ordered
   recovery through retry or same-revision cancellation.
+- A Player fullscreen presentation control that keeps video, DOM graphics and surround regions in the same fullscreen element where browser support allows.
 
 ## Architecture
 
@@ -28,8 +30,11 @@ Operator rundown or direct control
 
 | Area | Responsibility |
 | --- | --- |
-| `apps/admin` | Operator controls and rundown |
+| `apps/admin` | Vite operator shell, production prep, rundown, rehearsal, live run, diagnostics |
 | `apps/player` | HLS playback, PTS scheduling, viewer rendering |
+| `apps/web` | Next.js audience/demo wrapper |
+| `packages/player-core` | Player timing/revision helpers |
+| `packages/player-ui` | Shared viewer presentation components |
 | `packages/event-schema` | Compact transport validation |
 | `packages/id3` | TPE1 encode/decode |
 | `packages/presentation-model` | Transport-independent presentation state |
@@ -59,7 +64,7 @@ See [Pilot Demonstration Runbook](docs/Pilot%20Demonstration%20Runbook.md) for t
 The local PostgreSQL workflow, committed migrations, seed data, and outbox
 semantics are documented in [Database Development Guide](docs/Database%20Development%20Guide.md).
 
-For the technical system overview, see [V1 Architecture](docs/V1%20Architecture.md).
+For the current release-baseline status, see [Current Status](docs/CURRENT_STATUS.md). For the technical system overview, see [V1 Architecture](docs/V1%20Architecture.md).
 
 ```bash
 pnpm pilot:down
@@ -99,15 +104,25 @@ The custom TS segmenter preserves timed-ID3 packets where normal FFmpeg remuxing
 ## Verification and development
 
 ```bash
-pnpm build
+pnpm install
 pnpm typecheck
+pnpm build
 pnpm verify
+pnpm --filter @showgather/admin test
+docker compose --env-file .env -f deploy/compose/docker-compose.yml build
 ```
 
 CI reproduces builds, TypeScript tests, and TS-segmenter Go tests. Browser/HLS timing remains a documented Safari pilot acceptance test.
 
 ## Known V1 limitations
 
+- Native video-control fullscreen may show only video and hide DOM graphics;
+  use the ShowGather Player fullscreen button for composed fullscreen.
+- Casting, AirPlay and Picture-in-Picture graphics behaviour has not yet been
+  verified.
+- Recent Admin shell manual checks did not deliberately manufacture a live
+  delivery failure, although retry/cancel behaviour is covered by existing
+  milestone validation and tests.
 - PostgreSQL persistence is local-pilot infrastructure; no production backup,
   high-availability, or multi-operator deployment has been implemented.
 - The ordered database outbox assumes one active API dispatcher process per

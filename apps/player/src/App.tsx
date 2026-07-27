@@ -6,6 +6,27 @@ import { PresentationProvider, PresentationRegion, usePresentation, ViewerShell,
 import type { CompanionPanel, CompanionPanelLabels } from "@showgather/player-ui";
 import { useSyncClient } from "./useSyncClient";
 
+type FullscreenDocument = Document & {
+  webkitFullscreenElement?: Element | null;
+  webkitExitFullscreen?: () => Promise<void> | void;
+};
+
+type FullscreenElement = HTMLDivElement & {
+  webkitRequestFullscreen?: () => Promise<void> | void;
+};
+
+function fullscreenElement(): Element | null {
+  const doc = document as FullscreenDocument;
+  return document.fullscreenElement ?? doc.webkitFullscreenElement ?? null;
+}
+
+function exitFullscreen() {
+  if (document.fullscreenElement) return document.exitFullscreen();
+  const doc = document as FullscreenDocument;
+  if (doc.webkitFullscreenElement && doc.webkitExitFullscreen) return Promise.resolve(doc.webkitExitFullscreen());
+  return Promise.resolve();
+}
+
 function deltaClass(delta: number | null): string {
   if (delta === null) return "pending";
   const abs = Math.abs(delta);
@@ -35,6 +56,7 @@ function viewerContextFromProduction(data: { title?: unknown; configuration?: un
 
 function ViewerExperience() {
   const videoRef = useRef<HTMLVideoElement>(null);
+  const playerRootRef = useRef<FullscreenElement>(null);
   const search = new URLSearchParams(window.location.search);
   const requestedProfile = search.get("profile");
   const [profile, setProfile] = useState<ViewerProfile>(requestedProfile === "mobile" || requestedProfile === "tv" ? requestedProfile : "desktop");
@@ -45,6 +67,7 @@ function ViewerExperience() {
   const productionId = search.get("productionId");
   const channelId = window.location.pathname.match(/^\/player\/([^/]+)/)?.[1];
   const [viewerContext, setViewerContext] = useState<ViewerContext>(defaultViewerContext);
+  const [isFullscreen, setIsFullscreen] = useState(false);
   const { applyCommand, expireAt, replaceState } = usePresentation();
   const revisionGate = useRef(new PersistentRevisionGate());
   const hydrateSnapshot = useCallback(() => {
@@ -77,6 +100,38 @@ function ViewerExperience() {
       .forEach(applyCommand);
   }, [applyCommand, hydrateSnapshot]);
   const { overlays, syncLog, status } = useSyncClient(videoRef, { onTimedEvent, onMediaTime: expireAt, rehearsal });
+
+  useEffect(() => {
+    const updateFullscreenState = () => {
+      const active = fullscreenElement() === playerRootRef.current;
+      setIsFullscreen(active);
+      document.body.classList.toggle("player-fullscreen-active", active);
+    };
+    document.addEventListener("fullscreenchange", updateFullscreenState);
+    document.addEventListener("webkitfullscreenchange", updateFullscreenState);
+    updateFullscreenState();
+    return () => {
+      document.removeEventListener("fullscreenchange", updateFullscreenState);
+      document.removeEventListener("webkitfullscreenchange", updateFullscreenState);
+      document.body.classList.remove("player-fullscreen-active");
+    };
+  }, []);
+
+  const toggleFullscreen = useCallback(() => {
+    const root = playerRootRef.current;
+    if (!root) return;
+    if (fullscreenElement() === root) {
+      void exitFullscreen();
+      return;
+    }
+    if (root.requestFullscreen) {
+      void root.requestFullscreen();
+      return;
+    }
+    if (root.webkitRequestFullscreen) {
+      void root.webkitRequestFullscreen();
+    }
+  }, []);
 
   const video = <div className="video-container">
     <video ref={videoRef} controls autoPlay muted className="video-player" />
@@ -114,7 +169,15 @@ function ViewerExperience() {
     </header>}
     {embedded && <p className="embedded-status" role="status">{viewerContext.liveLabel} · {viewerContext.programmeTitle}{channelId ? ` · channel ${channelId}` : ""}{rehearsal ? " · rehearsal" : ""}</p>}
     {connectionNotice && <p className="viewer-availability" role="status">{connectionNotice}</p>}
-    <ViewerShell profile={profile} video={video} diagnostics={diagnosticsEnabled ? diagnostics : null} enabledPanels={viewerContext.enabledPanels} panelLabels={viewerContext.panelLabels} layoutDefinitions={viewerContext.layoutDefinitions} />
+    <div ref={playerRootRef} className={`player-root ${isFullscreen ? "player-root--fullscreen" : ""}`}>
+      <div className="player-toolbar">
+        <span>{profile} presentation output</span>
+        <button type="button" className="fullscreen-toggle" onClick={toggleFullscreen} aria-pressed={isFullscreen} aria-label={isFullscreen ? "Exit fullscreen presentation" : "Enter fullscreen presentation"}>
+          {isFullscreen ? "Exit fullscreen" : "Fullscreen"}
+        </button>
+      </div>
+      <ViewerShell profile={profile} video={video} diagnostics={diagnosticsEnabled ? diagnostics : null} enabledPanels={viewerContext.enabledPanels} panelLabels={viewerContext.panelLabels} layoutDefinitions={viewerContext.layoutDefinitions} />
+    </div>
   </div>;
 }
 
