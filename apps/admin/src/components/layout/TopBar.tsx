@@ -26,7 +26,9 @@ export function TopBar({
   const isProductionsHome = workspace === "productions";
 
   let subtitle: string;
-  if (isProductionsHome) {
+  if (workspace === "diagnostics") {
+    subtitle = "Technical observability — read-mostly system detail";
+  } else if (isProductionsHome) {
     subtitle = "Choose or create a saved production";
   } else if (workspace === "run") {
     subtitle = "Focused live operation";

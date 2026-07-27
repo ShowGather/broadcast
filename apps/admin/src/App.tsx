@@ -10,7 +10,7 @@ import { ViewerPlacementEditor, ViewerProgrammeStage, ViewerSelectionPanel, View
 import { ConfigurationActionsPanel, ConfigurationEditorPanel, ConfigurationLibraryPanel, ConfigurationSummaryPanel, useShowConfigurationWorkspace } from "./components/ShowConfigurationWorkspace.js";
 import { RehearsalContextPanel, RehearsalCueStackPanel, RehearsalProgrammeStage, RehearsalResultPanel, useRehearsalWorkspace } from "./components/RehearseWorkspace.js";
 import { ConfirmationDialog, RunContextPanel, RunDispatchPanel, RunOperationsPanel, RunProgrammeStage } from "./components/RunWorkspaceSection.js";
-import { DiagnosticsPanel } from "./components/DiagnosticsPanel.js";
+import { DiagnosticsInspectorPanel, DiagnosticsNavigationPanel, DiagnosticsOverviewPanel, DiagnosticsRecordsPanel, useDiagnosticsWorkspace } from "./components/DiagnosticsPanel.js";
 import type { OutboxItem, RundownCue } from "./types.js";
 import { useSystemHealth } from "./hooks/useSystemHealth.js";
 import { useAdminSelectors } from "./hooks/useAdminSelectors.js";
@@ -195,6 +195,28 @@ export default function App() {
     navigate,
     mutate,
   });
+  const diagnosticsWorkspace = useDiagnosticsWorkspace({
+    workspace,
+    apiConnection,
+    streamConnection,
+    channels,
+    productions,
+    rundowns,
+    channelId,
+    productionId,
+    rundownId,
+    selectedProduction,
+    sessionId,
+    status,
+    error,
+    events,
+    outbox,
+    unresolvedOutbox,
+    refreshEvents: fetchEvents,
+    refreshOutbox: fetchOutbox,
+    refreshRundown: fetchRundown,
+    resolveOutbox,
+  });
 
   const primaryWorkspace = <>
       {route.workspace === "productions" && <ProductionsCataloguePanel workspace={productionsWorkspace} />}
@@ -217,56 +239,54 @@ export default function App() {
   const viewerShellProps = { showConfig, previewProfile, setPreviewProfile, realOutputUrl: layoutPreviewUrl, saveProduction: saveViewerProduction };
   const runShellProps = { rundowns, rundownId, rundown, selectedProduction, disabledCueCount, apiConnection, streamConnection, sessionId, unresolvedOutbox, outbox, events, status, error, programmePreviewUrl, runWorkspace, resolveOutbox };
   const farLeft = isRundownWorkspace
-    ? <RundownElementsPanel {...rundownShellProps} />
+    ? diagnosticsOpen ? <DiagnosticsNavigationPanel diagnostics={diagnosticsWorkspace} /> : <RundownElementsPanel {...rundownShellProps} />
     : isViewerWorkspace
-      ? <ViewerSelectionPanel {...viewerShellProps} />
+      ? diagnosticsOpen ? <DiagnosticsNavigationPanel diagnostics={diagnosticsWorkspace} /> : <ViewerSelectionPanel {...viewerShellProps} />
     : isPrepareOverviewWorkspace
-      ? <PrepareNavigationPanel workspace={prepareWorkspace} />
+      ? diagnosticsOpen ? <DiagnosticsNavigationPanel diagnostics={diagnosticsWorkspace} /> : <PrepareNavigationPanel workspace={prepareWorkspace} />
     : isShowConfigurationWorkspace
-      ? <ConfigurationLibraryPanel workspace={showConfigurationWorkspace} />
+      ? diagnosticsOpen ? <DiagnosticsNavigationPanel diagnostics={diagnosticsWorkspace} /> : <ConfigurationLibraryPanel workspace={showConfigurationWorkspace} />
     : isRehearseWorkspace
-      ? <><AdminContext route={route} channels={channels} productions={productions} rundowns={rundowns} channelId={channelId} productionId={productionId} rundownId={rundownId} productionSwitchLocked={productionSwitchLocked} selectionError={selectionError} onChannelChange={setChannelId} onProductionChange={setProductionId} onRundownChange={setRundownId} /><RehearsalContextPanel previewProfile={previewProfile} setPreviewProfile={setPreviewProfile} sessionId={sessionId} returnToPrepare={returnToPrepare} /></>
+      ? diagnosticsOpen ? <DiagnosticsNavigationPanel diagnostics={diagnosticsWorkspace} /> : <><AdminContext route={route} channels={channels} productions={productions} rundowns={rundowns} channelId={channelId} productionId={productionId} rundownId={rundownId} productionSwitchLocked={productionSwitchLocked} selectionError={selectionError} onChannelChange={setChannelId} onProductionChange={setProductionId} onRundownChange={setRundownId} /><RehearsalContextPanel previewProfile={previewProfile} setPreviewProfile={setPreviewProfile} sessionId={sessionId} returnToPrepare={returnToPrepare} /></>
       : workspace === "run"
-        ? <RunContextPanel {...runShellProps} />
+        ? diagnosticsOpen ? <DiagnosticsNavigationPanel diagnostics={diagnosticsWorkspace} /> : <RunContextPanel {...runShellProps} />
     : isProductionsHome
-      ? <ProductionsFilterPanel workspace={productionsWorkspace} />
+      ? diagnosticsOpen ? <DiagnosticsNavigationPanel diagnostics={diagnosticsWorkspace} /> : <ProductionsFilterPanel workspace={productionsWorkspace} />
     : <AdminContext route={route} channels={channels} productions={productions} rundowns={rundowns} channelId={channelId} productionId={productionId} rundownId={rundownId} productionSwitchLocked={productionSwitchLocked} selectionError={selectionError} onChannelChange={setChannelId} onProductionChange={setProductionId} onRundownChange={setRundownId} />;
 
   const centreBottom = isRundownWorkspace
-    ? <RundownCueEditor rundownEditor={rundownEditor} commandBuilder={commandBuilder} />
+    ? diagnosticsOpen ? <DiagnosticsRecordsPanel diagnostics={diagnosticsWorkspace} /> : <RundownCueEditor rundownEditor={rundownEditor} commandBuilder={commandBuilder} />
     : isViewerWorkspace
-      ? <ViewerPlacementEditor {...viewerShellProps} />
+      ? diagnosticsOpen ? <DiagnosticsRecordsPanel diagnostics={diagnosticsWorkspace} /> : <ViewerPlacementEditor {...viewerShellProps} />
     : isPrepareOverviewWorkspace
-      ? <PrepareProductionEditor workspace={prepareWorkspace} />
+      ? diagnosticsOpen ? <DiagnosticsRecordsPanel diagnostics={diagnosticsWorkspace} /> : <PrepareProductionEditor workspace={prepareWorkspace} />
     : isShowConfigurationWorkspace
-      ? <ConfigurationEditorPanel workspace={showConfigurationWorkspace} />
+      ? diagnosticsOpen ? <DiagnosticsRecordsPanel diagnostics={diagnosticsWorkspace} /> : <ConfigurationEditorPanel workspace={showConfigurationWorkspace} />
     : isRehearseWorkspace
-      ? <RehearsalResultPanel ui={rehearsalWorkspace} rundownEditor={rundownEditor} sessionId={sessionId} />
+      ? diagnosticsOpen ? <DiagnosticsRecordsPanel diagnostics={diagnosticsWorkspace} /> : <RehearsalResultPanel ui={rehearsalWorkspace} rundownEditor={rundownEditor} sessionId={sessionId} />
     : workspace === "run"
-      ? <RunDispatchPanel {...runShellProps} />
+      ? diagnosticsOpen ? <DiagnosticsRecordsPanel diagnostics={diagnosticsWorkspace} /> : <RunDispatchPanel {...runShellProps} />
     : isProductionsHome
-      ? <ProductionDraftPanel workspace={productionsWorkspace} />
+      ? diagnosticsOpen ? <DiagnosticsRecordsPanel diagnostics={diagnosticsWorkspace} /> : <ProductionDraftPanel workspace={productionsWorkspace} />
     : <section className="shell-context-panel" aria-label="Workspace context">
       <strong>{route.workspace === "productions" ? "Production library" : `${workspace} workspace`}</strong>
       <span>Select and operate within the active workspace above.</span>
     </section>;
 
   const farRight = isRundownWorkspace
-    ? <RundownCueStackPanel rundownEditor={rundownEditor} commandBuilder={commandBuilder} rundown={rundown} previewCue={previewRundownCue} />
+    ? diagnosticsOpen ? <DiagnosticsInspectorPanel diagnostics={diagnosticsWorkspace} /> : <RundownCueStackPanel rundownEditor={rundownEditor} commandBuilder={commandBuilder} rundown={rundown} previewCue={previewRundownCue} />
     : isViewerWorkspace
-      ? <ViewerStatusPanel {...viewerShellProps} />
+      ? diagnosticsOpen ? <DiagnosticsInspectorPanel diagnostics={diagnosticsWorkspace} /> : <ViewerStatusPanel {...viewerShellProps} />
     : isPrepareOverviewWorkspace
-      ? <PrepareReadinessPanel workspace={prepareWorkspace} />
+      ? diagnosticsOpen ? <DiagnosticsInspectorPanel diagnostics={diagnosticsWorkspace} /> : <PrepareReadinessPanel workspace={prepareWorkspace} />
     : isShowConfigurationWorkspace
-      ? <ConfigurationActionsPanel workspace={showConfigurationWorkspace} />
+      ? diagnosticsOpen ? <DiagnosticsInspectorPanel diagnostics={diagnosticsWorkspace} /> : <ConfigurationActionsPanel workspace={showConfigurationWorkspace} />
     : isRehearseWorkspace
-      ? <RehearsalCueStackPanel ui={rehearsalWorkspace} rundown={rundown} rundownId={rundownId} returnToPrepare={returnToPrepare} />
+      ? diagnosticsOpen ? <DiagnosticsInspectorPanel diagnostics={diagnosticsWorkspace} /> : <RehearsalCueStackPanel ui={rehearsalWorkspace} rundown={rundown} rundownId={rundownId} returnToPrepare={returnToPrepare} />
     : workspace === "run"
-      ? <RunOperationsPanel {...runShellProps} />
+      ? diagnosticsOpen ? <DiagnosticsInspectorPanel diagnostics={diagnosticsWorkspace} /> : <RunOperationsPanel {...runShellProps} />
     : isProductionsHome
-      ? <ProductionSummaryPanel workspace={productionsWorkspace} />
-    : diagnosticsOpen
-    ? <DiagnosticsPanel workspace={workspace} events={events} outbox={outbox} resolveOutbox={resolveOutbox} />
+      ? diagnosticsOpen ? <DiagnosticsInspectorPanel diagnostics={diagnosticsWorkspace} /> : <ProductionSummaryPanel workspace={productionsWorkspace} />
     : <section className="shell-operations-panel" aria-label="Operational status">
         <strong>Workspace status</strong>
         <span>{sessionId ? `Session ${sessionId}` : "No active execution session"}</span>
@@ -284,10 +304,10 @@ export default function App() {
 
   return <AdminStateContext.Provider value={adminState}>
     <AdminShell
-      className={isProductionsHome ? "admin-shell--productions" : isViewerWorkspace ? "admin-shell--viewer" : isPrepareOverviewWorkspace ? "admin-shell--prepare" : isShowConfigurationWorkspace ? "admin-shell--configuration" : workspace === "run" ? "admin-shell--run" : ""}
-      topBar={<TopBar apiConnection={apiConnection} streamConnection={streamConnection} workspace={route.workspace} productionId={productionId} selectedProduction={selectedProduction} diagnosticsOpen={diagnosticsOpen} onToggleDiagnostics={() => setDiagnosticsOpen((open) => !open)} onNavigateHome={() => navigate({ workspace: "productions" })} onNavigate={navigate} />}
+      className={diagnosticsOpen ? "admin-shell--diagnostics" : isProductionsHome ? "admin-shell--productions" : isViewerWorkspace ? "admin-shell--viewer" : isPrepareOverviewWorkspace ? "admin-shell--prepare" : isShowConfigurationWorkspace ? "admin-shell--configuration" : workspace === "run" ? "admin-shell--run" : ""}
+      topBar={<TopBar apiConnection={apiConnection} streamConnection={streamConnection} workspace={diagnosticsOpen ? "diagnostics" : route.workspace} productionId={productionId} selectedProduction={selectedProduction} diagnosticsOpen={diagnosticsOpen} onToggleDiagnostics={() => setDiagnosticsOpen((open) => !open)} onNavigateHome={() => navigate({ workspace: "productions" })} onNavigate={navigate} />}
       farLeft={farLeft}
-      centreTop={primaryWorkspace}
+      centreTop={diagnosticsOpen ? <DiagnosticsOverviewPanel diagnostics={diagnosticsWorkspace} /> : primaryWorkspace}
       centreBottom={centreBottom}
       farRight={farRight}
       statusBar={statusBar}

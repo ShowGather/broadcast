@@ -3,6 +3,7 @@ import test from "node:test";
 import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { AdminStateContext, type AdminStateValue } from "./components/AdminStateContext.js";
+import { DiagnosticsInspectorPanel, DiagnosticsNavigationPanel, DiagnosticsOverviewPanel, DiagnosticsRecordsPanel, eventLabel } from "./components/DiagnosticsPanel.js";
 import { PrepareNavigationPanel, PrepareProductionEditor, PrepareReadinessPanel, PrepareSummaryPanel } from "./components/PrepareOverview.js";
 import { ProductionDraftPanel, ProductionsCataloguePanel, ProductionsFilterPanel, ProductionSummaryPanel, productionVisibleInFilter } from "./components/ProductionsHome.js";
 import { RehearsalCueStackPanel, RehearsalProgrammeStage, executeRehearsalCue, rehearsalGoDisabledReason } from "./components/RehearseWorkspace.js";
@@ -471,4 +472,129 @@ test("Productions panels do not duplicate Prepare controls, LegacyOverlay, or li
   assert.doesNotMatch(html, /Advanced legacy overlay controls/);
   assert.doesNotMatch(html, />GO</);
   assert.doesNotMatch(html, /Save production/);
+});
+
+const diagnosticEvent = {
+  event: { id: "evt-1", t: "pc", p: { k: "score.update" } },
+  injectedAt: "2026-07-27T12:00:00.000Z",
+};
+const diagnosticOutbox = {
+  id: "outbox-1",
+  eventId: "evt-2",
+  revision: 12,
+  label: "Home goal",
+  status: "failed",
+  error: "Connection refused",
+  retryable: true,
+  cancellable: true,
+};
+
+function diagnosticsWorkspaceMock(overrides: Record<string, unknown> = {}) {
+  const records = [
+    { type: "event", id: "evt-1", label: "Command: score.update", status: "dispatched", timestamp: diagnosticEvent.injectedAt, payload: diagnosticEvent },
+    { type: "outbox", id: "outbox-1", label: "Home goal", status: "failed", revision: 12, error: "Connection refused", payload: diagnosticOutbox },
+  ];
+  return {
+    workspace: "run",
+    apiConnection: "connected",
+    streamConnection: "offline",
+    selectedChannel: { id: "channel-1", name: "Demo Channel", slug: "demo", status: "active" },
+    selectedProduction: productionItem,
+    selectedRundown: { id: "rundown-1", name: "Main", version: 1 },
+    channelId: "channel-1",
+    productionId: "production-1",
+    rundownId: "rundown-1",
+    sessionId: "session-1",
+    status: "Latest status",
+    error: "",
+    events: [diagnosticEvent],
+    outbox: [diagnosticOutbox],
+    unresolvedOutbox: [diagnosticOutbox],
+    category: "overview",
+    setCategory: () => {},
+    records,
+    selectedRecord: records[1],
+    setSelectedRecordId: () => {},
+    refresh: async () => {},
+    resolveOutbox: async () => {},
+    ...overrides,
+  } as any;
+}
+
+test("Diagnostics health overview renders real and unknown states", () => {
+  const html = renderToStaticMarkup(createElement(DiagnosticsOverviewPanel, { diagnostics: diagnosticsWorkspaceMock() }));
+  assert.match(html, /System health/);
+  assert.match(html, /API/);
+  assert.match(html, /connected/);
+  assert.match(html, /Player/);
+  assert.match(html, /Unknown/);
+  assert.doesNotMatch(html, /Player[^]*healthy/);
+});
+
+test("Diagnostics categories render from supported data", () => {
+  const html = renderToStaticMarkup(createElement(DiagnosticsNavigationPanel, { diagnostics: diagnosticsWorkspaceMock() }));
+  assert.match(html, /Overview/);
+  assert.match(html, /Events/);
+  assert.match(html, /Delivery/);
+  assert.match(html, /Demo Channel/);
+});
+
+test("Diagnostics selected record updates inspector content", () => {
+  const html = renderToStaticMarkup(createElement(DiagnosticsInspectorPanel, { diagnostics: diagnosticsWorkspaceMock() }));
+  assert.match(html, /Home goal/);
+  assert.match(html, /Revision/);
+  assert.match(html, /Connection refused/);
+});
+
+test("Diagnostics empty record state renders clearly", () => {
+  const html = renderToStaticMarkup(createElement(DiagnosticsRecordsPanel, { diagnostics: diagnosticsWorkspaceMock({ records: [] }) }));
+  assert.match(html, /No diagnostic records/);
+});
+
+test("Diagnostics error state is visible", () => {
+  const html = renderToStaticMarkup(createElement(DiagnosticsOverviewPanel, { diagnostics: diagnosticsWorkspaceMock({ error: "Unable to load outbox" }) }));
+  assert.match(html, /Latest Admin error/);
+  assert.match(html, /Unable to load outbox/);
+});
+
+test("Diagnostics refresh invokes existing handler once", async () => {
+  let refreshes = 0;
+  const workspace = diagnosticsWorkspaceMock({ refresh: async () => { refreshes += 1; } });
+  await workspace.refresh();
+  assert.equal(refreshes, 1);
+});
+
+test("Diagnostics panels do not render operational controls or programme preview", () => {
+  const workspace = diagnosticsWorkspaceMock();
+  const html = [
+    renderToStaticMarkup(createElement(DiagnosticsNavigationPanel, { diagnostics: workspace })),
+    renderToStaticMarkup(createElement(DiagnosticsOverviewPanel, { diagnostics: workspace })),
+    renderToStaticMarkup(createElement(DiagnosticsRecordsPanel, { diagnostics: workspace })),
+    renderToStaticMarkup(createElement(DiagnosticsInspectorPanel, { diagnostics: workspace })),
+  ].join("");
+  assert.doesNotMatch(html, />GO</);
+  assert.doesNotMatch(html, /GO IN REHEARSAL/);
+  assert.doesNotMatch(html, /Safe Clear/);
+  assert.doesNotMatch(html, /PROGRAMME PREVIEW/);
+  assert.doesNotMatch(html, /PLAYER PREVIEW/);
+});
+
+test("Diagnostics eligible retry and cancel handlers are invoked once", async () => {
+  let retries = 0;
+  let cancels = 0;
+  const workspace = diagnosticsWorkspaceMock({
+    resolveOutbox: async (_item: typeof diagnosticOutbox, action: "retry" | "cancel") => {
+      if (action === "retry") retries += 1;
+      if (action === "cancel") cancels += 1;
+    },
+  });
+  await workspace.resolveOutbox(diagnosticOutbox, "retry");
+  await workspace.resolveOutbox(diagnosticOutbox, "cancel");
+  assert.equal(retries, 1);
+  assert.equal(cancels, 1);
+});
+
+test("Diagnostics event labels use existing event terminology", () => {
+  assert.equal(eventLabel(diagnosticEvent.event as any), "Command: score.update");
+  assert.equal(eventLabel({ id: "evt-3", t: "presentation.clear", p: {} } as any), "Safe Clear");
 });

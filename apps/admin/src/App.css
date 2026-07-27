@@ -313,6 +313,15 @@ body {
       "centre-bottom"
       "status-bar";
   }
+  .admin-shell--diagnostics {
+    grid-template-areas:
+      "top-bar"
+      "centre-top"
+      "far-right"
+      "centre-bottom"
+      "far-left"
+      "status-bar";
+  }
   .rundown-stage__canvas { min-height: 230px; }
   .rundown-cue-stack .cue-list { max-height: 310px; }
   .rundown-cue-editor__layout { grid-template-columns: 1fr; }
@@ -323,6 +332,9 @@ body {
   .configuration-summary-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .configuration-editor-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .production-draft-form { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .diagnostics-health-grid, .diagnostics-summary-list { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .diagnostics-record-list button { grid-template-columns: auto minmax(0, 1fr); }
+  .diagnostics-record-list button .mono { grid-column: 2; }
   .admin-shell--configuration .configuration-summary-panel { min-height: 0; }
   .rehearsal-stage__canvas { min-height: 230px; }
   .rehearsal-result-panel dl { grid-template-columns: repeat(2, minmax(0, 1fr)); }
@@ -355,6 +367,11 @@ body {
   .admin-shell--productions .production-card { grid-template-columns: 1fr; }
   .admin-shell--productions .production-card__actions { align-items: stretch; flex-direction: column; }
   .admin-shell--productions .production-card__actions .action-btn { justify-content: center; width: 100%; }
+  .admin-shell--diagnostics .diagnostics-health-grid,
+  .admin-shell--diagnostics .diagnostics-summary-list { grid-template-columns: 1fr; }
+  .admin-shell--diagnostics .diagnostics-record-list { max-height: none; }
+  .admin-shell--diagnostics .diagnostics-record-list button { grid-template-columns: 1fr; }
+  .admin-shell--diagnostics .diagnostics-record-list button .mono { grid-column: auto; }
   .rehearsal-stage__warning, .rehearsal-stage__footerbar { align-items: flex-start; flex-direction: column; }
   .rehearsal-stage__canvas { min-height: 205px; grid-template-columns: 34px minmax(0, 1fr) 34px; grid-template-rows: 23px minmax(0, 1fr) 23px; }
   .rehearsal-result-panel dl { grid-template-columns: 1fr; }
@@ -411,6 +428,45 @@ body {
 .production-summary h3 { margin: 8px 0 5px; color: #f3f8ff; font-size: 1.06rem; line-height: 1.2; }
 .production-summary__actions { display: grid; gap: 7px; border-top: 1px solid #293849; padding-top: 10px; }
 .production-summary__actions .action-btn { justify-content: center; width: 100%; }
+
+/* Diagnostics is a read-mostly observability workspace in the permanent shell. */
+.diagnostics-navigation-panel, .diagnostics-inspector-panel { display: grid; align-content: start; gap: 12px; }
+.diagnostics-context-card { display: grid; gap: 4px; border: 1px solid #30445e; border-radius: 7px; padding: 10px; background: #0e1825; overflow-wrap: anywhere; }
+.diagnostics-context-card span { color: #91a6c0; font-size: .66rem; font-weight: 800; letter-spacing: .08em; text-transform: uppercase; }
+.diagnostics-context-card strong { color: #edf7ff; font-size: .8rem; line-height: 1.35; }
+.diagnostics-category-list { display: grid; gap: 7px; }
+.diagnostics-category-list button { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 3px 8px; border: 1px solid #30445e; border-radius: 7px; padding: 9px; background: #0e1825; color: #aebdd0; cursor: pointer; text-align: left; }
+.diagnostics-category-list button:hover, .diagnostics-category-list button:focus-visible, .diagnostics-category-list button.active { border-color: #73e3ff; background: #15304a; outline: none; }
+.diagnostics-category-list strong { color: #eaf5ff; font-size: .8rem; }
+.diagnostics-category-list span { grid-column: 1; font-size: .72rem; line-height: 1.35; }
+.diagnostics-category-list em { grid-column: 2; grid-row: 1 / span 2; align-self: center; min-width: 28px; border: 1px solid #415672; border-radius: 999px; padding: 3px 7px; color: #dcecff; font-style: normal; font-size: .72rem; text-align: center; }
+.diagnostics-navigation-panel > .action-btn { justify-content: center; width: 100%; }
+.diagnostics-overview-panel { display: grid; gap: 12px; min-height: 100%; }
+.diagnostics-critical { display: grid; gap: 4px; border: 1px solid #a5484f; border-radius: 8px; padding: 10px; background: #35191d; color: #ffc9cc; }
+.diagnostics-critical strong { color: #fff1f2; font-size: .82rem; }
+.diagnostics-critical span { font-size: .76rem; line-height: 1.4; }
+.diagnostics-health-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 9px; }
+.diagnostics-health-card { display: grid; gap: 5px; border: 1px solid #34465e; border-radius: 8px; padding: 10px; background: #0f1926; min-width: 0; }
+.diagnostics-health-card span { color: #94a9c0; font-size: .68rem; font-weight: 800; letter-spacing: .08em; text-transform: uppercase; }
+.diagnostics-health-card strong { color: #edf7ff; font-size: .9rem; text-transform: capitalize; }
+.diagnostics-health-card p { color: #9fb1c8; font-size: .72rem; line-height: 1.35; }
+.diagnostics-health-card--healthy { border-color: #2f6d50; }
+.diagnostics-health-card--failed { border-color: #9d4040; }
+.diagnostics-health-card--unknown { border-color: #78612b; }
+.diagnostics-summary-list { grid-template-columns: repeat(5, minmax(0, 1fr)); }
+.diagnostics-records-panel { display: grid; gap: 12px; padding: 13px; }
+.diagnostics-record-list { display: grid; gap: 7px; max-height: min(36vh, 420px); overflow: auto; }
+.diagnostics-record-list button { display: grid; grid-template-columns: auto minmax(150px, 1.1fr) minmax(110px, .7fr) minmax(120px, .9fr); align-items: center; gap: 8px; border: 1px solid #30445e; border-radius: 7px; padding: 9px; background: #0e1825; color: #aebdd0; cursor: pointer; text-align: left; }
+.diagnostics-record-list button:hover, .diagnostics-record-list button:focus-visible, .diagnostics-record-list button.active { border-color: #73e3ff; background: #15304a; outline: none; }
+.diagnostics-record-list strong { min-width: 0; color: #ecf6ff; font-size: .82rem; overflow-wrap: anywhere; }
+.diagnostics-record-list .mono { min-width: 0; overflow-wrap: anywhere; }
+.diagnostics-inspector h3 { margin: 8px 0; color: #f3f8ff; font-size: 1rem; overflow-wrap: anywhere; }
+.diagnostics-inspector .summary-list dd { overflow-wrap: anywhere; }
+.diagnostics-payload { margin-top: 10px; border: 1px solid #38475b; border-radius: 7px; padding: 8px; background: #0f1825; color: #9fb0c5; font-size: .74rem; }
+.diagnostics-payload summary { cursor: pointer; color: #c7d7ea; font-weight: 800; }
+.diagnostics-payload pre { max-height: 280px; margin-top: 8px; overflow: auto; white-space: pre-wrap; overflow-wrap: anywhere; color: #dcecff; font-size: .68rem; line-height: 1.45; }
+.diagnostics-inspector__actions { display: grid; gap: 7px; margin-top: 10px; border-top: 1px solid #293849; padding-top: 10px; }
+.diagnostics-inspector__actions .action-btn { justify-content: center; width: 100%; }
 
 /* Prepare overview uses the permanent shell directly. It is a guided setup
    surface; legacy overlay controls are retained only as collapsed advanced tools. */
