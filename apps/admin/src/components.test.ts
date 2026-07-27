@@ -4,6 +4,7 @@ import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { AdminStateContext, type AdminStateValue } from "./components/AdminStateContext.js";
 import { PrepareNavigationPanel, PrepareProductionEditor, PrepareReadinessPanel, PrepareSummaryPanel } from "./components/PrepareOverview.js";
+import { ProductionDraftPanel, ProductionsCataloguePanel, ProductionsFilterPanel, ProductionSummaryPanel, productionVisibleInFilter } from "./components/ProductionsHome.js";
 import { RehearsalCueStackPanel, RehearsalProgrammeStage, executeRehearsalCue, rehearsalGoDisabledReason } from "./components/RehearseWorkspace.js";
 import { RunOperationsPanel, RunProgrammeStage, executeLiveCue, liveGoDisabledReason } from "./components/RunWorkspaceSection.js";
 import { ConfigurationActionsPanel, ConfigurationEditorPanel, ConfigurationLibraryPanel, ConfigurationSummaryPanel, validateConfigurationDraft } from "./components/ShowConfigurationWorkspace.js";
@@ -344,4 +345,130 @@ test("Prepare legacy overlay is retained only as secondary advanced content", ()
   assert.match(html, /Advanced legacy overlay controls/);
   assert.match(html, /Custom legacy overlay/);
   assert.doesNotMatch(renderToStaticMarkup(createElement(PrepareSummaryPanel, { workspace: prepareWorkspaceMock() })), /Custom legacy overlay/);
+});
+
+const productionChannel = { id: "channel-1", name: "Demo Channel", slug: "demo", status: "active" };
+const productionItem = { id: "production-1", channelId: "channel-1", title: "Cup Final 2026", description: "Final match", status: "rehearsal", scheduledStart: "2026-07-25T14:30:00.000Z", configuration: { programmeTitle: "Cup Final 2026" } };
+const draftProductionItem = { id: "production-2", channelId: "channel-1", title: "Community Awards", description: "", status: "draft", scheduledStart: null, configuration: null };
+
+function productionsWorkspaceMock(overrides: Record<string, unknown> = {}) {
+  return {
+    channels: [productionChannel],
+    productions: [productionItem, draftProductionItem],
+    filteredProductions: [productionItem, draftProductionItem],
+    rundowns: [{ id: "rundown-1", name: "V1 Demonstration", version: 1 }],
+    channelId: "channel-1",
+    productionId: "production-1",
+    selectedProduction: productionItem,
+    selectedChannel: productionChannel,
+    statusFilter: "all",
+    setStatusFilter: () => {},
+    statuses: ["draft", "rehearsal"],
+    draftMode: "edit",
+    setDraftMode: () => {},
+    draft: { title: "Cup Final 2026", description: "Final match", status: "rehearsal", scheduledStart: "2026-07-25T14:30", scheduledEnd: "" },
+    updateDraft: () => {},
+    validationErrors: [],
+    pending: false,
+    createProduction: async () => {},
+    saveProduction: async () => {},
+    duplicateProduction: async () => {},
+    selectProduction: () => {},
+    openPrepare: () => {},
+    openRundown: () => {},
+    openViewer: () => {},
+    openRehearse: () => {},
+    openRun: () => {},
+    changeChannel: () => {},
+    ...overrides,
+  } as any;
+}
+
+test("Productions catalogue renders production cards in the centre slot", () => {
+  const html = renderToStaticMarkup(createElement(ProductionsCataloguePanel, { workspace: productionsWorkspaceMock() }));
+  assert.match(html, /Production catalogue/);
+  assert.match(html, /Cup Final 2026/);
+  assert.match(html, /Community Awards/);
+  assert.match(html, /Open Prepare/);
+});
+
+test("Productions empty channel state renders clearly", () => {
+  const html = renderToStaticMarkup(createElement(ProductionsCataloguePanel, { workspace: productionsWorkspaceMock({ channelId: "", selectedChannel: undefined, productions: [], filteredProductions: [] }) }));
+  assert.match(html, /No channel selected/);
+  assert.match(html, /Choose a channel/);
+});
+
+test("Productions channel selection invokes shared setter", () => {
+  let changedTo = "";
+  const workspace = productionsWorkspaceMock({
+    channels: [productionChannel, { id: "channel-2", name: "Main Channel", slug: "main", status: "active" }],
+    changeChannel: (id: string) => { changedTo = id; },
+  });
+  const html = renderToStaticMarkup(createElement(ProductionsFilterPanel, { workspace }));
+  assert.match(html, /Demo Channel/);
+  workspace.changeChannel("channel-2");
+  assert.equal(changedTo, "channel-2");
+});
+
+test("Productions status filtering updates visible catalogue", () => {
+  const html = renderToStaticMarkup(createElement(ProductionsCataloguePanel, { workspace: productionsWorkspaceMock({ statusFilter: "draft", filteredProductions: [draftProductionItem] }) }));
+  assert.match(html, /Community Awards/);
+  assert.doesNotMatch(html, /Cup Final 2026/);
+});
+
+test("Productions filter rule identifies stale selected production context", () => {
+  assert.equal(productionVisibleInFilter(productionItem as any, "all"), true);
+  assert.equal(productionVisibleInFilter(productionItem as any, "rehearsal"), true);
+  assert.equal(productionVisibleInFilter(productionItem as any, "draft"), false);
+  assert.equal(productionVisibleInFilter(undefined, "all"), false);
+});
+
+test("Productions selection updates selected summary", () => {
+  const html = renderToStaticMarkup(createElement(ProductionSummaryPanel, { workspace: productionsWorkspaceMock({ selectedProduction: draftProductionItem, productionId: "production-2", rundowns: [] }) }));
+  assert.match(html, /Community Awards/);
+  assert.match(html, /Open Prepare/);
+  assert.match(html, /Open Rundown/);
+});
+
+test("Productions draft panel opens new production and invokes create once", async () => {
+  let creates = 0;
+  const workspace = productionsWorkspaceMock({ draftMode: "create", createProduction: async () => { creates += 1; } });
+  const html = renderToStaticMarkup(createElement(ProductionDraftPanel, { workspace }));
+  assert.match(html, /Create production/);
+  await workspace.createProduction();
+  assert.equal(creates, 1);
+});
+
+test("Productions pending create state prevents duplicate requests", () => {
+  const html = renderToStaticMarkup(createElement(ProductionDraftPanel, { workspace: productionsWorkspaceMock({ draftMode: "create", pending: true }) }));
+  assert.match(html, /Saving/);
+  assert.match(html, /disabled=""/);
+});
+
+test("Productions Open Prepare preserves production context", () => {
+  let opened = "";
+  const workspace = productionsWorkspaceMock({ openPrepare: (id?: string) => { opened = id ?? ""; } });
+  workspace.openPrepare("production-1");
+  assert.equal(opened, "production-1");
+});
+
+test("Productions duplicate action is available through existing support", async () => {
+  let duplicates = 0;
+  const workspace = productionsWorkspaceMock({ duplicateProduction: async () => { duplicates += 1; } });
+  await workspace.duplicateProduction("production-1");
+  assert.equal(duplicates, 1);
+});
+
+test("Productions panels do not duplicate Prepare controls, LegacyOverlay, or live GO", () => {
+  const workspace = productionsWorkspaceMock();
+  const html = [
+    renderToStaticMarkup(createElement(ProductionsFilterPanel, { workspace })),
+    renderToStaticMarkup(createElement(ProductionsCataloguePanel, { workspace })),
+    renderToStaticMarkup(createElement(ProductionDraftPanel, { workspace })),
+    renderToStaticMarkup(createElement(ProductionSummaryPanel, { workspace })),
+  ].join("");
+  assert.doesNotMatch(html, /Custom legacy overlay/);
+  assert.doesNotMatch(html, /Advanced legacy overlay controls/);
+  assert.doesNotMatch(html, />GO</);
+  assert.doesNotMatch(html, /Save production/);
 });

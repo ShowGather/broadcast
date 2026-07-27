@@ -3,7 +3,7 @@ import { adminPath, parseAdminRoute, type AdminRoute } from "./routing.js";
 
 import { AdminContext } from "./components/AdminContext.js";
 import { AdminStateContext, type AdminStateValue } from "./components/AdminStateContext.js";
-import { ProductionsHome } from "./components/ProductionsHome.js";
+import { ProductionDraftPanel, ProductionsCataloguePanel, ProductionsFilterPanel, ProductionSummaryPanel, useProductionsWorkspace } from "./components/ProductionsHome.js";
 import { PrepareNavigationPanel, PrepareProductionEditor, PrepareReadinessPanel, PrepareSummaryPanel, usePrepareWorkspace } from "./components/PrepareOverview.js";
 import { RundownCueEditor, RundownCueStackPanel, RundownElementsPanel, RundownProgrammeStage } from "./components/RundownWorkspace.js";
 import { ViewerPlacementEditor, ViewerProgrammeStage, ViewerSelectionPanel, ViewerStatusPanel } from "./components/ViewerWorkspace.js";
@@ -181,9 +181,23 @@ export default function App() {
     legacyOverlay: { title, setTitle, message, setMessage, duration, setDuration },
   };
   const prepareWorkspace = usePrepareWorkspace(prepareShellProps);
+  const productionsWorkspace = useProductionsWorkspace({
+    channels,
+    productions,
+    rundowns,
+    channelId,
+    productionId,
+    setChannelId,
+    setProductionId,
+    setRundownId,
+    refreshProductions,
+    refreshRundowns,
+    navigate,
+    mutate,
+  });
 
   const primaryWorkspace = <>
-      {route.workspace === "productions" && <ProductionsHome channels={channels} productions={productions} rundowns={rundowns} setChannelId={setChannelId} setProductionId={setProductionId} createProduction={createProduction} refreshProductions={refreshProductions} />}
+      {route.workspace === "productions" && <ProductionsCataloguePanel workspace={productionsWorkspace} />}
 
       {isPrepareOverviewWorkspace && <PrepareSummaryPanel workspace={prepareWorkspace} />}
 
@@ -214,6 +228,8 @@ export default function App() {
       ? <><AdminContext route={route} channels={channels} productions={productions} rundowns={rundowns} channelId={channelId} productionId={productionId} rundownId={rundownId} productionSwitchLocked={productionSwitchLocked} selectionError={selectionError} onChannelChange={setChannelId} onProductionChange={setProductionId} onRundownChange={setRundownId} /><RehearsalContextPanel previewProfile={previewProfile} setPreviewProfile={setPreviewProfile} sessionId={sessionId} returnToPrepare={returnToPrepare} /></>
       : workspace === "run"
         ? <RunContextPanel {...runShellProps} />
+    : isProductionsHome
+      ? <ProductionsFilterPanel workspace={productionsWorkspace} />
     : <AdminContext route={route} channels={channels} productions={productions} rundowns={rundowns} channelId={channelId} productionId={productionId} rundownId={rundownId} productionSwitchLocked={productionSwitchLocked} selectionError={selectionError} onChannelChange={setChannelId} onProductionChange={setProductionId} onRundownChange={setRundownId} />;
 
   const centreBottom = isRundownWorkspace
@@ -228,6 +244,8 @@ export default function App() {
       ? <RehearsalResultPanel ui={rehearsalWorkspace} rundownEditor={rundownEditor} sessionId={sessionId} />
     : workspace === "run"
       ? <RunDispatchPanel {...runShellProps} />
+    : isProductionsHome
+      ? <ProductionDraftPanel workspace={productionsWorkspace} />
     : <section className="shell-context-panel" aria-label="Workspace context">
       <strong>{route.workspace === "productions" ? "Production library" : `${workspace} workspace`}</strong>
       <span>Select and operate within the active workspace above.</span>
@@ -245,6 +263,8 @@ export default function App() {
       ? <RehearsalCueStackPanel ui={rehearsalWorkspace} rundown={rundown} rundownId={rundownId} returnToPrepare={returnToPrepare} />
     : workspace === "run"
       ? <RunOperationsPanel {...runShellProps} />
+    : isProductionsHome
+      ? <ProductionSummaryPanel workspace={productionsWorkspace} />
     : diagnosticsOpen
     ? <DiagnosticsPanel workspace={workspace} events={events} outbox={outbox} resolveOutbox={resolveOutbox} />
     : <section className="shell-operations-panel" aria-label="Operational status">
@@ -264,7 +284,7 @@ export default function App() {
 
   return <AdminStateContext.Provider value={adminState}>
     <AdminShell
-      className={isViewerWorkspace ? "admin-shell--viewer" : isPrepareOverviewWorkspace ? "admin-shell--prepare" : isShowConfigurationWorkspace ? "admin-shell--configuration" : workspace === "run" ? "admin-shell--run" : ""}
+      className={isProductionsHome ? "admin-shell--productions" : isViewerWorkspace ? "admin-shell--viewer" : isPrepareOverviewWorkspace ? "admin-shell--prepare" : isShowConfigurationWorkspace ? "admin-shell--configuration" : workspace === "run" ? "admin-shell--run" : ""}
       topBar={<TopBar apiConnection={apiConnection} streamConnection={streamConnection} workspace={route.workspace} productionId={productionId} selectedProduction={selectedProduction} diagnosticsOpen={diagnosticsOpen} onToggleDiagnostics={() => setDiagnosticsOpen((open) => !open)} onNavigateHome={() => navigate({ workspace: "productions" })} onNavigate={navigate} />}
       farLeft={farLeft}
       centreTop={primaryWorkspace}

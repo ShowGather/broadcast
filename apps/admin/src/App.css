@@ -304,6 +304,15 @@ body {
       "far-left"
       "status-bar";
   }
+  .admin-shell--productions {
+    grid-template-areas:
+      "top-bar"
+      "far-left"
+      "centre-top"
+      "far-right"
+      "centre-bottom"
+      "status-bar";
+  }
   .rundown-stage__canvas { min-height: 230px; }
   .rundown-cue-stack .cue-list { max-height: 310px; }
   .rundown-cue-editor__layout { grid-template-columns: 1fr; }
@@ -313,6 +322,7 @@ body {
   .prepare-summary-grid, .prepare-editor-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .configuration-summary-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .configuration-editor-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .production-draft-form { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .admin-shell--configuration .configuration-summary-panel { min-height: 0; }
   .rehearsal-stage__canvas { min-height: 230px; }
   .rehearsal-result-panel dl { grid-template-columns: repeat(2, minmax(0, 1fr)); }
@@ -341,6 +351,10 @@ body {
   .configuration-editor-heading { align-items: flex-start; flex-direction: column; }
   .admin-shell--configuration .configuration-summary-grid,
   .admin-shell--configuration .configuration-impact { display: none; }
+  .admin-shell--productions .production-draft-form { grid-template-columns: 1fr; }
+  .admin-shell--productions .production-card { grid-template-columns: 1fr; }
+  .admin-shell--productions .production-card__actions { align-items: stretch; flex-direction: column; }
+  .admin-shell--productions .production-card__actions .action-btn { justify-content: center; width: 100%; }
   .rehearsal-stage__warning, .rehearsal-stage__footerbar { align-items: flex-start; flex-direction: column; }
   .rehearsal-stage__canvas { min-height: 205px; grid-template-columns: 34px minmax(0, 1fr) 34px; grid-template-rows: 23px minmax(0, 1fr) 23px; }
   .rehearsal-result-panel dl { grid-template-columns: 1fr; }
@@ -371,7 +385,32 @@ body {
 .cue-grid button:hover { background: #1a3150; }.cue-grid .safe-clear { border-color: #8e3939; background: #35191c; color: #ffc6c6; }.cue-grid .safe-clear:hover { background: #522326; }
 .hint { margin: 10px 0 0; }
 .diagnostics-panel { margin: 24px 0; padding: 16px; border: 1px dashed #4c5a6d; border-radius: 9px; background: #101722; }.diagnostics-panel > p { margin-bottom: 14px; color: #9aaabe; font-size: .82rem; }
-.productions-home > .workspace-heading { margin-bottom: 16px; }.production-cards { display: grid; gap: 12px; }.production-card { display: flex; align-items: center; justify-content: space-between; gap: 18px; padding: 18px; border: 1px solid #334155; border-radius: 10px; background: #121a26; }.production-card h3 { margin: 7px 0 5px; color: #f3f8ff; font-size: 1.1rem; }.production-card p { color: #aebbd0; font-size: .86rem; }.production-card__status { display: inline-flex; align-items: center; gap: 5px; border: 1px solid #516278; border-radius: 999px; padding: 3px 7px; color: #c5d1e1; font-size: .68rem; font-weight: 800; letter-spacing: .06em; text-transform: uppercase; }.production-card__status--live { border-color: #c9555b; color: #ffb3b7; }.production-card__status--rehearsal { border-color: #b78c32; color: #ffe09a; }.production-card__status--draft { border-color: #516278; color: #c5d1e1; }.production-card__actions { display: flex; flex-wrap: wrap; gap: 8px; }.production-card__actions button, .productions-empty button { border: 1px solid #4d6584; border-radius: 6px; padding: 8px 11px; background: #1d3048; color: #eaf5ff; cursor: pointer; font-weight: 700; }.production-card__actions button + button { background: transparent; color: #b7c6d9; }.productions-empty { padding: 28px; border: 1px dashed #465a75; border-radius: 10px; background: #101824; }.productions-empty h3 { color: #eff7ff; }.productions-empty p { margin: 8px 0 16px; color: #aebbd0; }
+/* Productions catalogue uses the permanent shell directly: filters left,
+   catalogue centre, draft/edit controls below, selection summary right. */
+.productions-filter-panel, .production-summary-panel { display: grid; align-content: start; gap: 12px; }
+.productions-filter-panel__counts { display: grid; gap: 2px; border: 1px solid #30445e; border-radius: 7px; padding: 10px; background: #0e1825; color: #93a8c0; font-size: .76rem; }
+.productions-filter-panel__counts strong { color: #ecf7ff; font-size: 1.6rem; line-height: 1; }
+.productions-filter-panel > .action-btn { justify-content: center; width: 100%; }
+.productions-catalogue-panel { min-height: 100%; }
+.production-cards { display: grid; gap: 12px; }
+.production-card { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 14px; padding: 12px; border: 1px solid #334155; border-radius: 10px; background: #121a26; }
+.production-card--selected { border-color: #73e3ff; box-shadow: 0 0 0 1px rgba(115, 227, 255, .2); }
+.production-card__select { display: grid; min-width: 0; gap: 6px; border: 0; padding: 0; background: transparent; color: #aebbd0; cursor: pointer; text-align: left; }
+.production-card__select:focus-visible { outline: 2px solid #73e3ff; outline-offset: 4px; }
+.production-card__select strong { color: #f3f8ff; font-size: 1.08rem; line-height: 1.2; }
+.production-card__select span { font-size: .82rem; line-height: 1.35; }
+.production-card__topline { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; color: #95a8bf; }
+.production-card__actions { display: flex; align-items: flex-start; flex-wrap: wrap; gap: 8px; }
+.production-draft-panel { display: grid; gap: 12px; padding: 13px; }
+.production-draft-panel__mode, .production-draft-panel__actions { display: flex; flex-wrap: wrap; gap: 8px; }
+.production-draft-form { display: grid; grid-template-columns: minmax(160px, 1.1fr) minmax(190px, 1.5fr) minmax(120px, .65fr) minmax(150px, .85fr) minmax(150px, .85fr); gap: 10px; }
+.production-draft-form label { min-width: 0; font-size: .74rem; }
+.production-draft-form input, .production-draft-form textarea, .production-draft-form select { width: 100%; padding: 7px 8px; font-size: .82rem; }
+.production-draft-form textarea { resize: vertical; }
+.validation-list { display: grid; gap: 5px; border: 1px solid #a5484f; border-radius: 5px; padding: 8px 8px 8px 24px; background: #35191d; color: #ffc4c7; font-size: .72rem; }
+.production-summary h3 { margin: 8px 0 5px; color: #f3f8ff; font-size: 1.06rem; line-height: 1.2; }
+.production-summary__actions { display: grid; gap: 7px; border-top: 1px solid #293849; padding-top: 10px; }
+.production-summary__actions .action-btn { justify-content: center; width: 100%; }
 
 /* Prepare overview uses the permanent shell directly. It is a guided setup
    surface; legacy overlay controls are retained only as collapsed advanced tools. */
